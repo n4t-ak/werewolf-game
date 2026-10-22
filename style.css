@@ -1,0 +1,334 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif;
+  font-synthesis: none;
+  --ink: #f3f5fc;
+  --muted: #acb6cc;
+  --accent: #e36a71;
+  --line: #34405a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--ink);
+  background: radial-gradient(ellipse at 50% -10%, #24324c 0, transparent 54%),
+              linear-gradient(150deg, #0a101c, #171a2d 70%, #100f1d);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: .2;
+  background-image: radial-gradient(#e9ebfa 0.7px, transparent 0.7px);
+  background-size: 38px 38px;
+  pointer-events: none;
+}
+.app-shell { width: min(100% - 32px, 520px); margin: 0 auto; padding: 42px 0 28px; }
+.app-header { text-align: center; padding: 0 0 24px; }
+.brand-mark { display: inline-grid; place-items: center; color: #ffe7b4; font-size: 44px; width: 66px; height: 66px; border-radius: 50%; background: #ffffff0a; border: 1px solid #ffffff1c; box-shadow: 0 0 38px #e8c48f21; }
+.eyebrow { margin: 14px 0 6px; font-size: 10px; letter-spacing: .25em; color: #d0b6a6; font-weight: 700; }
+h1 { font-size: clamp(29px, 7vw, 42px); margin: 0; font-weight: 800; letter-spacing: .09em; }
+.subtitle { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+.game-card { padding: clamp(20px, 5vw, 34px); background: linear-gradient(145deg, #222b40ed, #181f31f4); border: 1px solid #46516c; border-radius: 24px; box-shadow: 0 24px 65px #0006, inset 0 1px #ffffff10; }
+#game { min-height: 220px; text-align: center; }
+#game h2 { margin: 4px 0 17px; font-size: clamp(22px, 5vw, 27px); line-height: 1.45; }
+#game h3 { margin-top: 22px; font-size: 17px; }
+#game p { line-height: 1.7; overflow-wrap: anywhere; }
+#game > p { color: var(--muted); }
+button { display: block; width: min(100%, 380px); margin: 20px auto 0; padding: 15px 20px; background: linear-gradient(110deg, #b8384e, #e15a63); color: #fff; border: 1px solid #ef8190; border-radius: 13px; font: inherit; font-size: 16px; font-weight: 750; cursor: pointer; box-shadow: 0 7px 20px #d1405836; transition: transform .18s ease, filter .18s ease, box-shadow .18s ease; }
+button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.12); box-shadow: 0 12px 24px #d1405850; }
+button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #f8c794; outline-offset: 3px; }
+button:disabled { opacity: .48; cursor: not-allowed; filter: grayscale(.4); }
+.field-label { display: block; font-size: 13px; color: #d6dbe8; font-weight: 650; margin: 25px 0 12px; }
+.number-field { position: relative; display: flex; align-items: center; justify-content: center; width: 160px; margin: 0 auto 12px; }
+.number-field input { width: 100%; padding: 16px 42px 16px 18px; text-align: center; font-size: 30px; font-weight: 700; }
+.number-field span { position: absolute; right: 22px; color: var(--muted); pointer-events: none; }
+input, select, textarea { color: var(--ink); font: inherit; background: #101728; border: 1px solid #485570; border-radius: 10px; padding: 12px 14px; }
+input[type="number"] { width: 100px; }
+#name-inputs { display: flex; flex-direction: column; gap: 12px; margin: 24px auto; max-width: 320px; }
+.name-input { width: 100%; font-size: 16px; }
+#role-settings { display: flex; flex-direction: column; gap: 11px; margin: 22px 0; }
+.role-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 15px; background: #101728a8; border: 1px solid var(--line); border-radius: 12px; }
+.role-row label { text-align: left; }
+.role-count { width: 78px!important; text-align: center; }
+.error-text { color: #ff9ca4!important; font-size: 14px; }
+.role { font-size: 30px; font-weight: 800; }
+.choice-list { display: grid; gap: 10px; margin: 22px 0 6px; }
+.choice-button { margin: 0; width: 100%; background: #303b57; border: 1px solid #566785; box-shadow: none; }
+.survivor-list { text-align: left; margin: 18px 0; }
+.survivor, .eliminated { margin: 8px 0; padding: 12px; border-radius: 9px; }
+.survivor { color: #a9edc6; background: #183d34a8; }
+.eliminated { color: #f5aab4; background: #542b37a8; }
+.wolf-opinion { text-align: left; background: #402936; border: 1px solid #8e4b5e; border-radius: 12px; padding: 14px; margin: 12px 0; }
+.wolf-opinion strong { color: #ffa8ae; }
+.wolf-opinion p { color: #f2dbe3!important; margin: 7px 0; }
+.wolf-select { width: 100%; display: block; margin: 12px auto; }
+.wolf-comment { width: 100%; margin: 12px 0; }
+.wolf-explanation { background: #422c37; border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px; text-align: left; line-height: 1.8; color: white!important; }
+.private-role-badge { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; padding: 12px 15px; border: 1px solid #94707a; background: #57324065; border-radius: 12px; text-align: left; }
+.private-role-badge span { font-size: 13px; color: #f3ccd4; }
+.private-role-badge strong { font-size: 19px; color: #fff; }
+.app-footer { padding-top: 24px; text-align: center; color: #79859f; font-size: 10px; letter-spacing: .14em; }
+@media (max-width: 420px) { .app-shell { padding-top: 24px; } .game-card { border-radius: 18px; } .private-role-badge { flex-direction: column; gap: 3px; align-items: flex-start; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none!important; transition: none!important; } }
+
+
+/* ===================================
+   人狼ゲーム UI最終調整
+=================================== */
+
+/* 画面全体 */
+.app-shell {
+  width: min(100% - 32px, 520px);
+  margin: 0 auto;
+}
+
+/* メインカード */
+.game-card {
+  background: linear-gradient(
+    145deg,
+    rgba(34, 43, 64, 0.96),
+    rgba(24, 31, 49, 0.98)
+  );
+
+  border: 1px solid #46516c;
+  border-radius: 24px;
+
+  box-shadow:
+    0 24px 65px rgba(0, 0, 0, 0.4),
+    inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* 日付やフェーズ名 */
+#game h2 {
+  font-size: 19px;
+  font-weight: 650;
+  color: #b4bfd4;
+  margin-bottom: 16px;
+}
+
+/* 今何をすべきかを示す説明 */
+#game > p {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: #ffffff;
+}
+
+/* 仲間の人狼の表示 */
+#game .wolf-explanation {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.8;
+}
+
+/* 人狼の意見カード */
+.wolf-opinion {
+  background: #402936;
+  border: 1px solid #8e4b5e;
+  border-radius: 12px;
+  padding: 17px;
+  margin: 14px 0;
+}
+
+.wolf-opinion strong {
+  font-size: 20px;
+  color: #ffb0b6;
+}
+
+/* 選択ボタン */
+.choice-button {
+  font-size: 19px;
+  font-weight: 700;
+  padding: 17px 18px;
+}
+
+/* メインボタン */
+button {
+  font-size: 18px;
+  font-weight: 750;
+  min-height: 54px;
+}
+
+/* 自分の役職 */
+.private-role-badge strong {
+  font-size: 23px;
+  font-weight: 800;
+}
+
+/* 人数選択 */
+.number-field input {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+/* スマホ対応 */
+@media (max-width: 420px) {
+  #game > p {
+    font-size: 19px;
+  }
+
+  #game h2 {
+    font-size: 17px;
+  }
+
+  .game-card {
+    border-radius: 18px;
+  }
+}
+
+
+/* ==============================
+   詳細設定
+============================== */
+
+.advanced-settings {
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid #46516c;
+  border-radius: 14px;
+  background: #1d263a;
+  text-align: left;
+}
+
+.advanced-settings summary {
+  cursor: pointer;
+  font-size: 19px;
+  font-weight: 700;
+  color: #ffe7b4;
+  padding: 4px;
+}
+
+.advanced-settings summary::marker {
+  color: #e36a71;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 18px 0;
+  border-bottom: 1px solid #46516c;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-description {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-description strong {
+  font-size: 16px;
+  color: #ffffff;
+}
+
+.setting-description p {
+  font-size: 13px;
+  color: #acb6cc;
+  margin: 6px 0 0;
+}
+
+/* ON・OFFスイッチ */
+
+.setting-switch {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  flex-shrink: 0;
+  display: block;
+  cursor: pointer;
+}
+
+.setting-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background: #47536a;
+  border-radius: 30px;
+  transition: background 0.25s;
+  pointer-events: none;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 4px;
+  top: 4px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.25s;
+}
+
+.setting-switch input:checked + .switch-slider {
+  background: #e36a71;
+}
+
+.setting-switch input:checked + .switch-slider::before {
+  transform: translateX(22px);
+}
+
+.setting-switch input:focus-visible + .switch-slider {
+  outline: 3px solid #f8c794;
+  outline-offset: 3px;
+}
+
+/* 狂人の人狼確認カード */
+
+.wolf-identity-card {
+  margin: 18px 0;
+  padding: 20px;
+  background: #422c37;
+  border: 1px solid #a65e6a;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.wolf-identity-card p {
+  font-size: 14px;
+  color: #f3ccd4;
+  margin: 0 0 10px;
+}
+
+.wolf-identity-card strong {
+  display: block;
+  font-size: clamp(22px, 5vw, 28px);
+  color: #ffe7b4;
+  overflow-wrap: anywhere;
+}
+
+
+/* 投票スキップボタン */
+.skip-button {
+  background: #303b57;
+  border: 1px solid #64748b;
+  box-shadow: none;
+  color: #ffffff;
+  margin-top: 12px;
+}
+
+/* キャンセルボタン */
+.cancel-button {
+  background: transparent;
+  border: 1px solid #64748b;
+  box-shadow: none;
+  color: #acb6cc;
+  margin-top: 12px;
+}

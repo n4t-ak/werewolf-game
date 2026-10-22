@@ -1273,3 +1273,494 @@ textarea:focus-visible {
     padding: 10px 6px;
   }
 }
+
+
+/* 怪盗の役職交換画面 */
+#game .choice-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+#game .choice-button {
+  min-width: 0;
+  min-height: 52px;
+  margin: 0;
+  padding: 13px 10px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* 怪盗の交換しないボタン */
+#game .back-button {
+  min-height: 48px;
+  background: #303b57;
+  color: #ffffff;
+  border: 1px solid #65708b;
+  border-radius: 12px;
+}
+
+/* 小さいスマホ */
+@media (max-width: 380px) {
+  #game .choice-list {
+    gap: 8px;
+  }
+
+  #game .choice-button {
+    padding: 12px 7px;
+    font-size: 13px;
+  }
+}
+
+
+#game .special-role-description {
+  width: 100%;
+  margin: 16px 0 24px;
+  padding: 16px;
+  background: #242b3a;
+  color: #ffffff;
+  border: 1px solid #65708b;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.8;
+  text-align: left;
+}
+
+
+/* 怪盗の交換結果 */
+#game .thief-role-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  text-align: center;
+}
+
+#game .thief-role-result span {
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+#game .thief-role-result strong {
+  color: #ff617b;
+  font-size: clamp(32px, 8vw, 46px);
+  font-weight: 900;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 18px rgba(255, 80, 110, 0.25);
+}
+
+
+/* 役職設定の各カード */
+#game .role-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: #252d40;
+  border: 1px solid #46516a;
+  border-radius: 14px;
+}
+
+/* 役職名と説明文 */
+#game .role-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* 役職名を大きく強調 */
+#game .role-name {
+  display: block;
+  color: #ffffff;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: left;
+}
+
+/* 一言説明 */
+#game .role-description {
+  margin: 0;
+  color: #b1bbce;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* 人数入力欄 */
+#game .role-count {
+  flex: 0 0 58px;
+  width: 58px;
+  min-width: 0;
+  height: 52px;
+  padding: 6px;
+  text-align: center;
+  font-size: 23px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #171d2b;
+  border: 1px solid #66718a;
+  border-radius: 10px;
+}
+
+/* スマートフォン対応 */
+@media (max-width: 480px) {
+  #game .role-row {
+    padding: 13px 11px;
+    gap: 8px;
+  }
+
+  #game .role-name {
+    font-size: 20px;
+  }
+
+  #game .role-description {
+    font-size: 12px;
+  }
+
+  #game .role-count {
+    flex-basis: 52px;
+    width: 52px;
+    height: 48px;
+    font-size: 21px;
+  }
+}
+
+
+/* 怪盗に役職を盗まれたときの通知 */
+#game .robbery-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  margin: 28px 0;
+}
+
+#game .robbery-notice > strong:first-child {
+  color: #ff617b;
+  font-size: clamp(24px, 6vw, 32px);
+  font-weight: 900;
+  line-height: 1.5;
+}
+
+#game .robbery-notice span {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+#game .robbery-notice .robbery-new-role {
+  color: #ff617b;
+  font-size: clamp(34px, 9vw, 48px);
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+
+/* ランダム事件カード */
+#game .event-card {
+  padding: 18px;
+  margin: 18px 0;
+  border: 1px solid #d08c59;
+  border-radius: 14px;
+  background: #372b2b;
+  text-align: center;
+}
+
+#game .event-card strong {
+  color: #ffd39b;
+  font-size: 20px;
+}
+
+#game .event-card p {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+/* 勝利演出 */
+#game .victory-screen {
+  padding: 32px 18px;
+  border-radius: 20px;
+  margin-bottom: 22px;
+  text-align: center;
+  animation: victory-appear 0.7s ease-out both;
+}
+
+#game .victory-wolf {
+  background: linear-gradient(145deg, #451a30, #221924);
+  border: 2px solid #e34f62;
+}
+
+#game .victory-village {
+  background: linear-gradient(145deg, #193d46, #182a34);
+  border: 2px solid #66c8d5;
+}
+
+#game .victory-teruteru {
+  background: linear-gradient(145deg, #504024, #262338);
+  border: 2px solid #ffd27e;
+}
+
+#game .victory-symbol {
+  color: #ffffff;
+  font-size: 76px;
+  animation: victory-glow 2s ease-in-out infinite alternate;
+}
+
+#game .victory-result {
+  color: #ffffff;
+  font-size: clamp(25px, 7vw, 38px);
+  font-weight: 900;
+}
+
+#game .victory-wolf .victory-result {
+  color: #ff829a;
+}
+
+#game .victory-village .victory-result {
+  color: #8be4ed;
+}
+
+#game .victory-teruteru .victory-result {
+  color: #ffe09a;
+}
+
+/* 振り返り */
+#game .review-panel {
+  margin: 20px 0;
+  padding: 18px 14px;
+  background: #1d2637;
+  border: 1px solid #46516a;
+  border-radius: 16px;
+}
+
+#game .review-panel[hidden] {
+  display: none !important;
+}
+
+#game .review-panel h3 {
+  color: #ffffff;
+  font-size: 21px;
+  margin: 22px 0 14px;
+}
+
+#game .review-player {
+  padding: 14px;
+  margin: 10px 0;
+  background: #252d40;
+  border: 1px solid #46516a;
+  border-radius: 12px;
+}
+
+#game .review-player strong {
+  color: #ffffff;
+  font-size: 19px;
+}
+
+#game .review-player p,
+#game .review-history-item {
+  color: #c6cfdd;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#game .review-history-item {
+  padding: 12px;
+  margin: 8px 0;
+  border-left: 3px solid #a45a6d;
+  background: #252d40;
+  border-radius: 6px;
+}
+
+#game .review-missing {
+  color: #ffd39b;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: center;
+  padding: 14px;
+}
+
+#game .review-button {
+  background: #84354b;
+  color: #ffffff;
+  border: 1px solid #e34f62;
+}
+
+@keyframes victory-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes victory-glow {
+  from {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (max-width: 480px) {
+  #game .victory-screen {
+    padding: 26px 12px;
+  }
+
+  #game .victory-symbol {
+    font-size: 60px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #game .victory-screen,
+  #game .victory-symbol {
+    animation: none;
+  }
+}
+
+
+/* =====================================
+   振り返り：役職を大きく赤く表示
+===================================== */
+
+#game .review-role-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  background: #1a2232;
+  border-radius: 10px;
+  text-align: left;
+}
+
+#game .review-role-row span {
+  color: #b1bbce;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+#game .review-role-row .review-role-name {
+  color: #ff617b !important;
+  font-size: clamp(24px, 6vw, 30px) !important;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* =====================================
+   振り返り：投票履歴
+===================================== */
+
+#game .review-vote-heading {
+  display: block;
+  color: #ffffff;
+  font-size: 18px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+#game .review-vote-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 4px;
+  border-bottom: 1px solid #46516a;
+  text-align: left;
+  font-size: 15px;
+}
+
+#game .review-vote-line:last-child {
+  border-bottom: none;
+}
+
+#game .review-vote-line span:first-child {
+  color: #c6cfdd;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#game .review-vote-arrow {
+  color: #aab2c3;
+  flex-shrink: 0;
+}
+
+#game .review-vote-target {
+  color: #ff617b !important;
+  font-size: clamp(17px, 4.5vw, 21px);
+  font-weight: 900;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* =====================================
+   狂人：人狼の名前を強調
+===================================== */
+
+#game .madman-wolf-card {
+  width: 100%;
+  padding: 22px 14px;
+  margin: 20px 0;
+  background: #392332;
+  border: 2px solid #e34f62;
+  border-radius: 16px;
+  box-shadow: 0 0 20px rgba(227, 79, 98, 0.18);
+  text-align: center;
+}
+
+#game .madman-wolf-card p {
+  color: #f3ccd4;
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+
+#game .madman-wolf-names {
+  display: block;
+  color: #ff617b !important;
+  font-size: clamp(29px, 7vw, 39px) !important;
+  font-weight: 900;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 15px rgba(255, 80, 110, 0.25);
+}
+
+
+/* 村人陣営：白色 */
+#game .review-role-row .review-team-village {
+  color: #ffffff !important;
+}
+
+/* 人狼陣営：赤色 */
+#game .review-role-row .review-team-wolf {
+  color: #ff617b !important;
+}
+
+/* 第三陣営：黄色 */
+#game .review-role-row .review-team-third {
+  color: #ffd166 !important;
+}

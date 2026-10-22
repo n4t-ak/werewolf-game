@@ -7,6 +7,10 @@ let roles = [];
 let alive = [];
 
 let currentPlayer = 0;
+let firstNightOrder = [];
+let pendingThiefSwap = null;
+let robbedPlayer = null;
+let robberyNoticeShown = false;
 let nightCount = 0;
 let dayCount = 0;
 
@@ -27,15 +31,80 @@ let seerHistory = {};
 
 
 // 詳細設定
+
 let gameSettings = {
   madmanKnowsWolves: false,
-  allowConsecutiveGuard: false
+  allowConsecutiveGuard: false,
+  roleMissing: false,
+  publicVotes: false,
+  randomEvents: false
 };
+
 
 // 騎士ごとの前夜の護衛先
 let knightHistory = {};
 // 前回のゲームで設定した役職人数を保存
 let lastRoleCounts = [];
+
+let initialRoles = [];
+let missingRole = null;
+let gameHistory = [];
+let discussionMinutes = 3;
+let currentEvent = null;
+
+function recordGameEvent(text) {
+  gameHistory.push(text);
+}
+
+function readExtraSettings() {
+  [
+    ["roleMissing", "role-missing"],
+    ["publicVotes", "public-votes"],
+    ["randomEvents", "random-events"]
+  ].forEach(([key, id]) => {
+    const input = document.getElementById(id);
+    if (input) gameSettings[key] = input.checked;
+  });
+}
+
+// 投票者の一覧を表示する共通処理
+function appendVoteDetails() {
+  if (!gameSettings.publicVotes) return;
+
+  const heading = document.createElement("h3");
+  heading.textContent = "誰が誰に投票したか";
+  game.appendChild(heading);
+
+  votes.forEach(vote => {
+    const p = document.createElement("p");
+    p.textContent =
+      `${players[vote.voter]} → ${players[vote.target]}`;
+    game.appendChild(p);
+  });
+}
+
+// 毎朝の事件カード
+function drawMorningEvent() {
+  discussionMinutes = 3;
+  currentEvent = null;
+
+  if (!gameSettings.randomEvents) return;
+
+  const chance = Math.random();
+
+  if (chance < 0.2) {
+    discussionMinutes = 2;
+    currentEvent = "緊急会議：議論時間が2分になります";
+  } else if (chance < 0.4) {
+    discussionMinutes = 5;
+    currentEvent = "延長会議：議論時間が5分になります";
+  } else {
+    currentEvent = "平穏な朝：議論時間は通常の3分です";
+  }
+
+  recordGameEvent(`${dayCount}日目：${currentEvent}`);
+}
+
 
 
 // 投票関連
@@ -45,13 +114,47 @@ let voteCandidates = [];
 let votes = [];
 let voteRound = 1;
 
+
+
 const roleTypes = [
-  { id: "werewolf", name: "人狼" },
-  { id: "madman", name: "狂人" },
-  { id: "seer", name: "占い師" },
-  { id: "knight", name: "騎士" },
-  { id: "medium", name: "霊媒師" }
+  {
+    id: "werewolf",
+    name: "人狼",
+    description: "毎晩1人を襲撃する"
+  },
+  {
+    id: "madman",
+    name: "狂人",
+    description: "人狼陣営の味方をする"
+  },
+  {
+    id: "seer",
+    name: "占い師",
+    description: "毎晩1人が人狼か占う"
+  },
+  {
+    id: "knight",
+    name: "騎士",
+    description: "毎晩1人を護衛する"
+  },
+  {
+    id: "medium",
+    name: "霊媒師",
+    description: "処刑された人の正体を調べる"
+  },
+  {
+    id: "teruteru",
+    name: "てるてる",
+    description: "昼に処刑されると単独勝利"
+  },
+  {
+    id: "thief",
+    name: "怪盗",
+    description: "最初の夜に1人と役職交換"
+  }
 ];
+
+
 
 // 夜・昼の個人操作画面に役職を表示する（受け渡し画面には表示しない）
 function showPrivateRoleBadge() {
@@ -71,7 +174,29 @@ function showPrivateRoleBadge() {
 
   badge.append(label, value);
   game.prepend(badge);
+
+  // 最初の夜だけ新役職の説明を表示
+  if (nightCount === 0) {
+    const role = roles[privateActor];
+
+    const explanations = {
+      "てるてる":
+        "あなたは第三陣営です。昼の投票で自分が処刑されると単独勝利します。人狼に襲撃されても勝利にはなりません。",
+
+      "怪盗":
+        "最初の夜に1人を選び、役職を交換できます。交換しないこともできます。交換は最初の夜の終了時に確定し、交換後に怪盗になった人は交換できません。"
+    };
+
+    if (explanations[role]) {
+      const description = document.createElement("p");
+      description.className = "special-role-description";
+      description.textContent = explanations[role];
+
+      badge.insertAdjacentElement("afterend", description);
+    }
+  }
 }
+
 
 // 画面が切り替わったとき、ふわっと現れるアニメーション
 // 子要素の直接の追加・削除のみ監視。テキスト入力中には動かない。
@@ -313,6 +438,41 @@ function showRoleSettings() {
       <span class="switch-slider"></span>
     </label>
   </div>
+
+  
+<div class="setting-item">
+  <div class="setting-description">
+    <strong>役職欠けを有効にする</strong>
+    <p>役職カードを1枚多く用意し、ランダムに1枚除外します。人狼は必ず残ります。</p>
+  </div>
+  <label class="setting-switch">
+    <input type="checkbox" id="role-missing">
+    <span class="switch-slider"></span>
+  </label>
+</div>
+
+<div class="setting-item">
+  <div class="setting-description">
+    <strong>投票履歴を公開する</strong>
+    <p>投票終了後、誰が誰に投票したかを全員に公開します。</p>
+  </div>
+  <label class="setting-switch">
+    <input type="checkbox" id="public-votes">
+    <span class="switch-slider"></span>
+  </label>
+</div>
+
+<div class="setting-item">
+  <div class="setting-description">
+    <strong>ランダム事件カード</strong>
+    <p>毎朝、確率で議論時間が2分または5分になります。</p>
+  </div>
+  <label class="setting-switch">
+    <input type="checkbox" id="random-events">
+    <span class="switch-slider"></span>
+  </label>
+</div>
+
 </details>
 
     
@@ -336,6 +496,7 @@ document.getElementById("back-to-names").onclick = () => {
   gameSettings.allowConsecutiveGuard =
     document.getElementById("consecutive-guard").checked;
 
+    readExtraSettings();
   showNameForm(players.length);
 
   // 入力済みの名前を復元
@@ -354,9 +515,22 @@ document.getElementById("back-to-names").onclick = () => {
     const row = document.createElement("div");
     row.className = "role-row";
 
-    const label = document.createElement("label");
-    label.textContent = role.name;
-    label.htmlFor = role.id;
+   
+// 役職名と説明文をまとめる
+const roleInfo = document.createElement("div");
+roleInfo.className = "role-info";
+
+const label = document.createElement("label");
+label.className = "role-name";
+label.textContent = role.name;
+label.htmlFor = role.id;
+
+const description = document.createElement("p");
+description.className = "role-description";
+description.textContent = role.description;
+
+roleInfo.append(label, description);
+
 
     const input = document.createElement("input");
     input.type = "number";
@@ -369,7 +543,7 @@ document.getElementById("back-to-names").onclick = () => {
   ? String(lastRoleCounts[index])
   : (index === 0 ? "1" : "0");
 
-    row.append(label, input);
+    row.append(roleInfo, input);
     container.appendChild(row);
 
     input.addEventListener("input", updateRoleCount);
@@ -400,6 +574,26 @@ document.getElementById("consecutive-guard")
     gameSettings.allowConsecutiveGuard =
       event.target.checked;
   });
+
+
+// 保存された設定を画面へ反映
+[
+  ["roleMissing", "role-missing"],
+  ["publicVotes", "public-votes"],
+  ["randomEvents", "random-events"]
+].forEach(([key, id]) => {
+  const input = document.getElementById(id);
+
+  input.checked = gameSettings[key];
+
+  
+input.addEventListener("change", () => {
+  gameSettings[key] = input.checked;
+  updateRoleCount();
+});
+
+});
+
 
 updateRoleCount();
 
@@ -433,8 +627,40 @@ function validateRoleCounts(counts) {
     return "人狼は村人陣営より少なくしてください";
   }
 
+  // てるてる・怪盗は最大1人
+  const teruteruIndex = roleTypes.findIndex(
+    role => role.id === "teruteru"
+  );
+
+  const thiefIndex = roleTypes.findIndex(
+    role => role.id === "thief"
+  );
+
+  if (counts[teruteruIndex] > 1) {
+    return "てるてるは最大1人までです";
+  }
+
+  if (counts[thiefIndex] > 1) {
+    return "怪盗は最大1人までです";
+  }
+
+// 役職欠けONでは、人狼以外の特殊役職が必要
+const specialRoleCount = counts
+  .slice(1)
+  .reduce((sum, n) => sum + n, 0);
+
+if (
+  gameSettings.roleMissing &&
+  specialRoleCount === 0
+) {
+  return "役職欠けを使う場合は、人狼以外の役職を1つ以上設定してください";
+}
+
+
+  // すべての条件を満たしたらエラーなし
   return "";
 }
+
 
 function updateRoleCount() {
   const counts = getRoleCounts();
@@ -484,12 +710,55 @@ function assignRoles(savedCounts = null) {
     roles.push("村人");
   }
 
+
+readExtraSettings();
+
+missingRole = null;
+
+if (gameSettings.roleMissing) {
+  // 人狼・村人以外の役職を抽選対象にする
+  const removable = roles
+    .map((role, index) => ({ role, index }))
+    .filter(item =>
+      item.role !== "人狼" &&
+      item.role !== "村人"
+    );
+
+  if (removable.length > 0) {
+    // 欠ける役職をランダムに1枚選ぶ
+    const choice = removable[
+      Math.floor(Math.random() * removable.length)
+    ];
+
+    // 欠けた役職を記録
+    missingRole = choice.role;
+
+    // 選ばれた特殊役職を村人に置き換える
+    roles[choice.index] = "村人";
+  }
+}
+
+
+
   // シャッフル
   for (let i = roles.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
 
     [roles[i], roles[j]] = [roles[j], roles[i]];
   }
+
+// シャッフル後の初期役職を保存
+initialRoles = [...roles];
+
+// 新しいゲームの履歴を初期化
+gameHistory = [];
+recordGameEvent("ゲーム開始");
+
+if (gameSettings.roleMissing) {
+  recordGameEvent(
+    "役職欠けあり（欠けた役職はゲーム終了後に公開）"
+  );
+}
 
   alive = players.map(() => true);
 
@@ -509,11 +778,19 @@ function assignRoles(savedCounts = null) {
     wolfProposals: []
   };
 
-  nightOrder = players.map((_, index) => index);
-  nightIndex = 0;
-  privateActor = null;
+  
+nightOrder = players.map((_, index) => index);
+nightIndex = 0;
+privateActor = null;
+isNightPhase = true;
 
-  showPassScreen();
+firstNightOrder = players.map((_, index) => index);
+pendingThiefSwap = null;
+robbedPlayer = null;
+robberyNoticeShown = false;
+
+showPassScreen();
+
 
 }
 
@@ -522,24 +799,67 @@ function assignRoles(savedCounts = null) {
 // ------------------------------------
 
 
+
 function showPassScreen() {
-  // 受け渡し画面では役職を隠す
   privateActor = null;
 
   // 全員が最初の夜の行動を終えた場合
-  if (currentPlayer >= players.length) {
-    resolveNight();
-    return;
-  }
+  
+if (currentPlayer >= firstNightOrder.length) {
+  // 全員が初夜の行動を終えてから交換
+  applyThiefSwap();
 
-    showPlayerPassScreen(
-    currentPlayer,
+  resolveNight();
+  return;
+}
+
+
+  const index = firstNightOrder[currentPlayer];
+
+  showPlayerPassScreen(
+    index,
     "役職と行動を確認",
-    showRole
+    () => showNightAction(index)
   );
 }
 
 
+
+function showMadmanWolfNames() {
+  // 現在生存している人狼を取得
+  const wolfNames = getLivingWolfNames();
+
+  const message = wolfNames.length > 0
+    ? "あなたが協力する人狼を確認してください。"
+    : "現在、生存している人狼はいません。";
+
+  showRandomWait(
+    "狂人：人狼の確認",
+    message
+  );
+
+  // 人狼の名前を大きな赤文字で表示
+  if (wolfNames.length > 0) {
+    const card = document.createElement("div");
+    card.className = "madman-wolf-card";
+
+    const label = document.createElement("p");
+    label.textContent = "生存している人狼";
+
+    const names = document.createElement("strong");
+    names.className = "madman-wolf-names";
+    names.textContent = wolfNames.join("、");
+
+    card.append(label, names);
+
+    // 待機メッセージの前に表示
+    const status = game.querySelector("h2 + p + p");
+
+    if (status) {
+      status.before(card);
+    }
+  }
+}
 
 // 生存している人狼の名前を取得
 function getLivingWolfNames() {
@@ -632,11 +952,55 @@ function showNightAction(index) {
   privateActor = index;
   const role = roles[index];
 
+  
+// 役職を盗まれた人に、2回目の夜に通知
+if (
+  nightCount === 1 &&
+  index === robbedPlayer &&
+  !robberyNoticeShown
+) {
+  robberyNoticeShown = true;
+
+  
+showScreen(
+  "役職変更のお知らせ",
+  "あなたは役職を盗まれました。新しい役職は「怪盗」です。",
+  "確認完了・画面を隠して次へ",
+  nextNightPlayer
+);
+
+  // 通知文を赤色で強調
+  const message = game.querySelector("h2 + p");
+
+  if (message) {
+    message.className = "robbery-notice";
+
+    const warning = document.createElement("strong");
+    warning.textContent = "あなたは役職を盗まれました";
+
+    const detail = document.createElement("span");
+    detail.textContent = "あなたの新しい役職は";
+
+    const newRole = document.createElement("strong");
+    newRole.className = "robbery-new-role";
+    newRole.textContent = "怪盗";
+
+    message.replaceChildren(warning, detail, newRole);
+  }
+
+  return;
+}
+
 
   // 最初の夜
-  if (nightCount === 0) {
-    if (role === "占い師") {
-      handleSeer(index);
+  
+if (nightCount === 0) {
+  if (role === "怪盗") {
+    handleThief(index);
+
+  } else if (role === "占い師") {
+    handleSeer(index);
+
 
     } else if (role === "人狼") {
       // 自分以外の生存人狼を取得
@@ -686,12 +1050,7 @@ if (teammates.length > 0) {
   gameSettings.madmanKnowsWolves
 ) {
   // 詳細設定がONの狂人
-  const wolfNames = getLivingWolfNames();
-
-  showRandomWait(
-    "狂人：人狼の確認",
-    `あなたが協力する人狼：${wolfNames.join("、")}`
-  );
+  showMadmanWolfNames();
 
 } else {
   showRandomWait(
@@ -714,15 +1073,23 @@ if (teammates.length > 0) {
   } else if (role === "騎士") {
     handleKnight(index);
 
-  } else if (role === "霊媒師") {
-    handleMedium();
+} else if (role === "霊媒師") {
+  handleMedium();
 
-  } else {
-    showRandomWait(
-      "夜のフェーズ",
-      "今夜は特殊行動がありません。"
-    );
-  }
+} else if (
+  role === "狂人" &&
+  gameSettings.madmanKnowsWolves
+) {
+  // 2回目以降の夜も人狼を確認
+  showMadmanWolfNames();
+
+} else {
+  showRandomWait(
+    "夜のフェーズ",
+    "今夜は特殊行動がありません。"
+  );
+}
+
 }
 
 
@@ -734,6 +1101,113 @@ function getTargets(index, excludeSelf = true) {
       alive[i] && (!excludeSelf || i !== index)
     );
 }
+
+
+function handleThief(index) {
+  const targets = players
+    .map((_, i) => i)
+    .filter(i => i !== index && alive[i]);
+
+  showChoices(
+    "怪盗：役職交換",
+    "交換する相手を1人選んでください。役職交換は最初の夜の終了時に確定します。",
+    targets,
+    target => {
+      // この時点では交換先だけを記録
+      pendingThiefSwap = {
+        thief: index,
+        target: target
+      };
+
+      // 交換で手に入れる役職
+      const stolenRole = roles[target];
+
+      showScreen(
+        "怪盗：交換した役職",
+        `${players[target]}さんを選びました。`,
+        "確認完了・画面を隠して次へ",
+        nextNightPlayer
+      );
+
+      // 交換した役職を大きく表示
+      const roleResult = document.createElement("div");
+      roleResult.className = "thief-role-result";
+
+      const roleLabel = document.createElement("p");
+      roleLabel.textContent = "交換後のあなたの役職";
+
+      const roleName = document.createElement("strong");
+      roleName.className = "thief-stolen-role";
+      roleName.textContent = stolenRole;
+
+      roleResult.append(roleLabel, roleName);
+
+      // 確認ボタンの直前に表示
+      const confirmButton = game.querySelector("button");
+
+      if (confirmButton) {
+        confirmButton.before(roleResult);
+      }
+    }
+  );
+
+  // 交換しない場合
+  const skipButton = document.createElement("button");
+  skipButton.textContent = "交換しない";
+  skipButton.className = "back-button";
+
+skipButton.onclick = () => {
+  pendingThiefSwap = null;
+
+  recordGameEvent(
+    `怪盗：${players[index]}は交換しなかった`
+  );
+
+  showScreen(
+    "怪盗：行動終了",
+    "今回は役職を交換しませんでした。",
+    "確認完了・画面を隠して次へ",
+    nextNightPlayer
+  );
+};
+
+  game.appendChild(skipButton);
+}
+
+
+
+// 最初の夜の終了時に、一度だけ交換を確定する
+
+
+function applyThiefSwap() {
+  if (pendingThiefSwap === null) {
+    return;
+  }
+
+  const { thief, target } = pendingThiefSwap;
+
+  // 交換相手が持っていた役職
+  const targetRole = roles[target];
+
+  // 実際に役職を交換
+  roles[thief] = targetRole;
+  roles[target] = "怪盗";
+
+  // 盗まれたプレイヤーを記録
+  robbedPlayer = target;
+  robberyNoticeShown = false;
+
+  // ゲーム終了後の振り返りに記録
+  recordGameEvent(
+    `怪盗：${players[thief]}が${players[target]}から「${targetRole}」を盗んだ`
+  );
+
+  // 同じ交換を二度実行しない
+  pendingThiefSwap = null;
+}
+
+
+
 
 // ------------------------------------
 // 7. 人狼の襲撃
@@ -960,6 +1434,11 @@ if (isSoloWolf) {
       // 最後の人狼が襲撃先を確定
       // 単独人狼もここで決定する
       nightActions.attack = target;
+      
+recordGameEvent(
+  `${nightCount + 1}回目の夜：人狼が${players[target]}を襲撃先に選択`
+);
+
 
       showWolfDecision();
 
@@ -1029,6 +1508,12 @@ function handleSeer(index) {
       const isWolf = roles[target] === "人狼";
 
       // 占い履歴に追加
+      
+recordGameEvent(
+  `${nightCount + 1}回目の夜：${players[index]}が${players[target]}を占い、` +
+  `${isWolf ? "人狼" : "人狼ではない"}と判定`
+);
+
       seerHistory[index].push(target);
 
       nightActions.inspections.push({
@@ -1148,6 +1633,11 @@ function handleKnight(index) {
     target => {
 
       // 今夜の護衛先を記録
+      
+recordGameEvent(
+  `${nightCount + 1}回目の夜：${players[index]}が${players[target]}を護衛`
+);
+
       nightActions.guards.push(target);
 
       // 次の夜のために護衛先を保存
@@ -1239,6 +1729,15 @@ function showMorning(victim) {
   privateActor = null;
   dayCount++;
 
+// 毎朝の事件カードを決定
+drawMorningEvent();
+
+recordGameEvent(
+  victim === null
+    ? `${dayCount}日目の朝：犠牲者なし`
+    : `${dayCount}日目の朝：${players[victim]}が襲撃された`
+);
+
 
   game.replaceChildren();
 
@@ -1252,6 +1751,21 @@ function showMorning(victim) {
     : `${players[victim]}さんが襲撃されました。`;
 
   game.append(title, result);
+
+// 事件カードの表示
+if (currentEvent !== null) {
+  const eventCard = document.createElement("div");
+  eventCard.className = "event-card";
+
+  const eventTitle = document.createElement("strong");
+  eventTitle.textContent = "本日の事件カード";
+
+  const eventText = document.createElement("p");
+  eventText.textContent = currentEvent;
+
+  eventCard.append(eventTitle, eventText);
+  game.appendChild(eventCard);
+}
 
   const heading = document.createElement("h3");
   heading.textContent = "現在の生存者";
@@ -1333,7 +1847,7 @@ function startDay() {
   pauseButton.className = "discussion-pause";
 
   // 初期時間は3分
-  let remainingMs = 3 * 60 * 1000;
+  let remainingMs = discussionMinutes * 60 * 1000;
   let lastTick = Date.now();
   let isPaused = false;
 
@@ -1590,33 +2104,57 @@ function countVotes() {
     results[vote.target]++;
   });
 
-  const maxVotes = Math.max(
-    ...Object.values(results)
-  );
+  
+// ゲーム終了後の振り返り用に投票を保存
+recordGameEvent(
+  `${dayCount}日目・${voteRound === 1 ? "通常投票" : "再投票"}：` +
+  votes.map(vote =>
+    `${players[vote.voter]}→${players[vote.target]}`
+  ).join("、")
+);
+
+  const maxVotes = Math.max(...Object.values(results));
 
   const topCandidates = voteCandidates.filter(
     index => results[index] === maxVotes
   );
 
-  // 最多得票者が1人
+  // 最多得票者が1人なら、そのプレイヤーを処刑
   if (topCandidates.length === 1) {
-    const executed = topCandidates[0];
-
-    showVoteResults(results, executed);
+    showVoteResults(results, topCandidates[0]);
     return;
   }
 
-  // 同票なら候補者を絞って再投票
-  voteCandidates = topCandidates;
-  voteRound++;
+  // 通常投票で同票になった場合
+  if (voteRound === 1) {
+    voteCandidates = topCandidates;
+    voteRound = 2;
+
+    showScreen(
+      "同票になりました",
+      `最多得票者が${topCandidates.length}人います。対象者だけで1回限りの再投票を行います。`,
+      "再投票へ",
+      beginVoteRound
+    );
+    appendVoteDetails();
+
+    return;
+  }
+
+  // 再投票でも同票なら、処刑せず夜へ進む
+  previousExecution = null;
+  privateActor = null;
+  isNightPhase = false;
 
   showScreen(
-    "同票になりました",
-    `最多得票者が${topCandidates.length}人います。候補者だけで再投票します。`,
-    "再投票へ",
-    beginVoteRound
+    "再投票も同票になりました",
+    "再投票でも決着がつかなかったため、今日は誰も処刑されません。",
+    "夜を開始",
+    startNight
   );
+  appendVoteDetails();
 }
+
 
 // ------------------------------------
 // 18. 投票結果と処刑
@@ -1630,6 +2168,14 @@ function showVoteResults(results, executed) {
   previousExecution = executed;
 
   game.replaceChildren();
+
+// 議論画面にも本日の事件を表示
+if (currentEvent !== null) {
+  const eventText = document.createElement("p");
+  eventText.className = "discussion-event";
+  eventText.textContent = currentEvent;
+  game.appendChild(eventText);
+}
 
   const title = document.createElement("h2");
   title.textContent = "投票結果";
@@ -1650,24 +2196,40 @@ function showVoteResults(results, executed) {
     `${players[executed]}さんが処刑されました。`;
 
   game.appendChild(result);
+  
+recordGameEvent(
+  `${dayCount}日目：${players[executed]}が処刑された`
+);
+
+// 設定ONなら投票者と投票先を公開
+appendVoteDetails();
+
 
   const button = document.createElement("button");
   button.textContent = "次へ";
 
-  button.onclick = () => {
-    const winner = checkWinner();
+button.onclick = () => {
 
-    if (winner !== null) {
-      showWinner(winner);
-    } else {
-      showScreen(
-        "夜になりました",
-        "生存者は次の夜を迎えます。",
-        "夜を開始",
-        startNight
-      );
-    }
-  };
+  // てるてるが処刑された場合は単独勝利
+  if (roles[executed] === "てるてる") {
+    showWinner("てるてる");
+    return;
+  }
+
+  const winner = checkWinner();
+
+  if (winner !== null) {
+    showWinner(winner);
+  } else {
+    showScreen(
+      "夜になりました",
+      "生存者は次の夜を迎えます。",
+      "夜を開始",
+      startNight
+    );
+  }
+};
+
 
   game.appendChild(button);
 }
@@ -1782,37 +2344,209 @@ function showPlayerCountSettings() {
 }
 
 
+function getReviewRoleClass(role) {
+  // 人狼陣営
+  if (role === "人狼" || role === "狂人") {
+    return "review-team-wolf";
+  }
+
+  // 第三陣営
+  if (role === "てるてる" || role === "怪盗") {
+    return "review-team-third";
+  }
+
+  // 村人陣営
+  return "review-team-village";
+}
+
 
 
 function showWinner(winner) {
   privateActor = null;
   isNightPhase = false;
 
+  clearInterval(discussionTimerId);
+  discussionTimerId = null;
+
   game.replaceChildren();
+
+  // 勝利陣営に応じた演出
+  const victory = document.createElement("div");
+  victory.className = "victory-screen";
+
+  if (winner === "人狼陣営") {
+    victory.classList.add("victory-wolf");
+  } else if (winner === "てるてる") {
+    victory.classList.add("victory-teruteru");
+  } else {
+    victory.classList.add("victory-village");
+  }
+
+  const symbol = document.createElement("div");
+  symbol.className = "victory-symbol";
+  symbol.textContent =
+    winner === "人狼陣営" ? "☾" :
+    winner === "てるてる" ? "✦" : "✧";
 
   const title = document.createElement("h2");
   title.textContent = "ゲーム終了";
 
   const result = document.createElement("h3");
-  result.textContent = `${winner}の勝利です！`;
+  result.className = "victory-result";
+  result.textContent = `${winner}の勝利！`;
 
-  // 前回の設定を引き継ぐ
-  const retryButton = document.createElement("button");
-  retryButton.textContent = "設定を引き継いで遊ぶ";
-  retryButton.onclick = () => {
-    showRoleSettings();
+  victory.append(symbol, title, result);
+  game.appendChild(victory);
+
+  // 振り返りボタン
+  const reviewButton = document.createElement("button");
+  reviewButton.textContent = "ゲームを振り返る";
+  reviewButton.className = "review-button";
+
+  const reviewPanel = document.createElement("div");
+  reviewPanel.className = "review-panel";
+  reviewPanel.hidden = true;
+
+  const roleHeading = document.createElement("h3");
+  roleHeading.textContent = "全員の役職";
+  reviewPanel.appendChild(roleHeading);
+
+  players.forEach((name, index) => {
+    const card = document.createElement("div");
+    card.className = "review-player";
+
+    const playerName = document.createElement("strong");
+    playerName.textContent = name;
+
+   
+const initial = document.createElement("div");
+initial.className = "review-role-row";
+
+const initialLabel = document.createElement("span");
+initialLabel.textContent = "最初の役職";
+
+
+const initialName = document.createElement("strong");
+initialName.className =
+  "review-role-name " + getReviewRoleClass(initialRoles[index]);
+initialName.textContent = initialRoles[index];
+
+
+initial.append(initialLabel, initialName);
+
+const finalRole = document.createElement("div");
+finalRole.className = "review-role-row";
+
+const finalLabel = document.createElement("span");
+finalLabel.textContent = "最終役職";
+
+
+const finalName = document.createElement("strong");
+finalName.className =
+  "review-role-name " + getReviewRoleClass(roles[index]);
+finalName.textContent = roles[index];
+
+
+finalRole.append(finalLabel, finalName);
+
+
+    const status = document.createElement("p");
+    status.textContent =
+      alive[index] ? "状態：生存" : "状態：脱落";
+
+    card.append(playerName, initial, finalRole, status);
+    reviewPanel.appendChild(card);
+  });
+
+  // 欠けた役職を発表
+  if (gameSettings.roleMissing) {
+    const missing = document.createElement("p");
+    missing.className = "review-missing";
+    missing.textContent =
+      `今回欠けていた役職：${missingRole}`;
+    reviewPanel.appendChild(missing);
+  }
+
+  const historyHeading = document.createElement("h3");
+  historyHeading.textContent = "ゲームの進行履歴";
+  reviewPanel.appendChild(historyHeading);
+
+
+gameHistory.forEach(entry => {
+  const item = document.createElement("div");
+  item.className = "review-history-item";
+
+  // 投票履歴かどうかを判定
+  if (entry.includes("通常投票：") ||
+      entry.includes("再投票：")) {
+
+    const separator = "：";
+    const position = entry.indexOf(separator);
+
+    const heading = document.createElement("strong");
+    heading.className = "review-vote-heading";
+    heading.textContent = entry.slice(0, position);
+
+    item.appendChild(heading);
+
+    const voteText = entry.slice(position + 1);
+
+    voteText.split("、").forEach(vote => {
+      const line = document.createElement("div");
+      line.className = "review-vote-line";
+
+      const parts = vote.split("→");
+
+      if (parts.length === 2) {
+        const voter = document.createElement("span");
+        voter.textContent = parts[0];
+
+        const arrow = document.createElement("span");
+        arrow.className = "review-vote-arrow";
+        arrow.textContent = "→";
+
+        const target = document.createElement("strong");
+        target.className = "review-vote-target";
+        target.textContent = parts[1];
+
+        line.append(voter, arrow, target);
+      } else {
+        line.textContent = vote;
+      }
+
+      item.appendChild(line);
+    });
+
+  } else {
+    item.textContent = entry;
+  }
+
+  reviewPanel.appendChild(item);
+});
+
+
+  reviewButton.onclick = () => {
+    reviewPanel.hidden = !reviewPanel.hidden;
+
+    reviewButton.textContent = reviewPanel.hidden
+      ? "ゲームを振り返る"
+      : "振り返りを閉じる";
   };
 
-  // 人数・名前から設定し直す
+  game.append(reviewButton, reviewPanel);
+
+  const retryButton = document.createElement("button");
+  retryButton.textContent = "設定を引き継いで遊ぶ";
+  retryButton.onclick = showRoleSettings;
+
   const changeButton = document.createElement("button");
   changeButton.textContent = "人数を変更して遊ぶ";
   changeButton.className = "secondary-button";
-  changeButton.onclick = () => {
-    showPlayerCountSettings();
-  };
+  changeButton.onclick = showPlayerCountSettings;
 
-  game.append(title, result, retryButton, changeButton);
+  game.append(retryButton, changeButton);
 }
+
 
 
 

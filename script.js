@@ -1,5 +1,6 @@
 
-const game = document.getElementById("game");
+
+
 
 let players = [];
 let roles = [];
@@ -15,6 +16,7 @@ let nightIndex = 0;
 
 // 秘密の個人操作画面だけで役職を表示する。受け渡し画面では null にする。
 let privateActor = null;
+let isNightPhase = false;
 
 let previousExecution = null;
 // 各占い師が過去に占ったプレイヤーを記録
@@ -29,6 +31,8 @@ let gameSettings = {
 
 // 騎士ごとの前夜の護衛先
 let knightHistory = {};
+// 前回のゲームで設定した役職人数を保存
+let lastRoleCounts = [];
 
 
 // 投票関連
@@ -48,6 +52,7 @@ const roleTypes = [
 
 // 夜・昼の個人操作画面に役職を表示する（受け渡し画面には表示しない）
 function showPrivateRoleBadge() {
+  if (!isNightPhase) return;
   if (privateActor === null) return;
   if (!roles[privateActor]) return;
 
@@ -164,6 +169,29 @@ function showChoices(title, message, targets, callback) {
 // 1. プレイヤー数の選択
 // ------------------------------------
 
+const initialCount = document.getElementById("count");
+const initialMinus = document.getElementById("initial-count-minus");
+const initialPlus = document.getElementById("initial-count-plus");
+
+function updateInitialCountButtons() {
+  const value = Number(initialCount.value);
+  initialMinus.disabled = value <= 3;
+  initialPlus.disabled = value >= 20;
+}
+
+initialMinus.onclick = () => {
+  initialCount.value = Math.max(3, Number(initialCount.value) - 1);
+  updateInitialCountButtons();
+};
+
+initialPlus.onclick = () => {
+  initialCount.value = Math.min(20, Number(initialCount.value) + 1);
+  updateInitialCountButtons();
+};
+
+initialCount.addEventListener("input", updateInitialCountButtons);
+updateInitialCountButtons();
+
 document.getElementById("start").onclick = () => {
   const count = Number(
     document.getElementById("count").value
@@ -182,12 +210,27 @@ document.getElementById("start").onclick = () => {
 // ------------------------------------
 
 function showNameForm(count) {
-  game.innerHTML = `
-    <h2>プレイヤー登録</h2>
-    <p>${count}人の名前を入力してください</p>
-    <div id="name-inputs"></div>
-    <button id="register">次へ</button>
-  `;
+  
+game.innerHTML = `
+  <h2>プレイヤー登録</h2>
+  <p>名前を入力してください（空欄でもOK）</p>
+  <p>空欄の場合はプレイヤー番号が自動設定されます。</p>
+  <div id="name-inputs"></div>
+  <button id="register">次へ</button>
+  <button id="back-to-count" class="back-button">
+    人数設定に戻る
+  </button>
+`;
+
+
+document.getElementById("back-to-count").onclick = () => {
+  const inputs = document.querySelectorAll(".name-input");
+
+  players = Array.from(inputs).map(input => input.value.trim());
+
+  showPlayerCountSettings();
+};
+
 
   const container = document.getElementById("name-inputs");
 
@@ -205,14 +248,16 @@ function showNameForm(count) {
   document.getElementById("register").onclick = () => {
     const inputs = document.querySelectorAll(".name-input");
 
-    players = Array.from(inputs).map(input =>
-      input.value.trim()
-    );
+   
+players = Array.from(inputs).map((input, index) => {
+  const name = input.value.trim();
 
-    if (players.some(name => name === "")) {
-      alert("全員の名前を入力してください");
-      return;
-    }
+  // 空欄なら自動的に名前を設定
+  return name === ""
+    ? `プレイヤー${index + 1}`
+    : name;
+});
+
 
     if (new Set(players).size !== players.length) {
       alert("同じ名前は使用できません");
@@ -267,10 +312,38 @@ function showRoleSettings() {
   </div>
 </details>
 
-    <p id="villager-count"></p>
-    <p id="role-error" class="error-text"></p>
-    <button id="assign">役職を決定</button>
+    
+<p id="villager-count"></p>
+<p id="role-error" class="error-text"></p>
+<button id="assign">役職を決定</button>
+<button id="back-to-names" class="back-button">
+  名前入力に戻る
+</button>
+
   `;
+
+
+document.getElementById("back-to-names").onclick = () => {
+  // 役職人数と詳細設定を保持
+  lastRoleCounts = getRoleCounts();
+
+  gameSettings.madmanKnowsWolves =
+    document.getElementById("madman-knows-wolves").checked;
+
+  gameSettings.allowConsecutiveGuard =
+    document.getElementById("consecutive-guard").checked;
+
+  showNameForm(players.length);
+
+  // 入力済みの名前を復元
+  document.querySelectorAll(".name-input").forEach((input, index) => {
+    input.value = players[index] ?? "";
+  });
+};
+
+
+
+
 
   const container = document.getElementById("role-settings");
 
@@ -289,7 +362,9 @@ function showRoleSettings() {
     input.min = "0";
     input.max = String(players.length);
     input.step = "1";
-    input.value = index === 0 ? "1" : "0";
+    input.value = lastRoleCounts.length === roleTypes.length
+  ? String(lastRoleCounts[index])
+  : (index === 0 ? "1" : "0");
 
     row.append(label, input);
     container.appendChild(row);
@@ -298,7 +373,16 @@ function showRoleSettings() {
   });
 
  
-document.getElementById("assign").onclick = assignRoles;
+
+document.getElementById("assign").onclick = () => assignRoles();
+
+  // 前回の詳細設定を画面に反映
+  document.getElementById("madman-knows-wolves").checked =
+    gameSettings.madmanKnowsWolves;
+
+  document.getElementById("consecutive-guard").checked =
+    gameSettings.allowConsecutiveGuard;
+
 
 // 狂人が人狼を把握できるか
 document.getElementById("madman-knows-wolves")
@@ -368,9 +452,17 @@ function updateRoleCount() {
 // 4. 役職配布
 // ------------------------------------
 
-function assignRoles() {
-  const counts = getRoleCounts();
+
+function assignRoles(savedCounts = null) {
+  // 初回は設定画面から取得し、
+  // 2回目以降は保存済みの設定を使用
+  const counts = savedCounts ?? getRoleCounts();
+
   const error = validateRoleCounts(counts);
+
+  // 役職の人数設定を保存
+  lastRoleCounts = [...counts];
+
 
   if (error) {
     alert(error);
@@ -405,31 +497,45 @@ function assignRoles() {
     seerHistory = {};
     knightHistory = {};
 
+  
+  // 最初の夜の行動を役職確認と同時に行うための準備
+  nightActions = {
+    attack: null,
+    guards: [],
+    inspections: [],
+    wolfProposals: []
+  };
+
+  nightOrder = players.map((_, index) => index);
+  nightIndex = 0;
+  privateActor = null;
+
   showPassScreen();
+
 }
 
 // ------------------------------------
 // 5. 役職確認
 // ------------------------------------
 
+
 function showPassScreen() {
+  // 受け渡し画面では役職を隠す
+  privateActor = null;
+
+  // 全員が最初の夜の行動を終えた場合
   if (currentPlayer >= players.length) {
-    showScreen(
-      "準備完了",
-      "全員の役職確認が終わりました",
-      "最初の夜へ",
-      startNight
-    );
+    resolveNight();
     return;
   }
 
-  showScreen(
-    players[currentPlayer],
-    "端末を受け取ってください",
-    "役職を確認",
+    showPlayerPassScreen(
+    currentPlayer,
+    "役職と行動を確認",
     showRole
   );
 }
+
 
 
 // 生存している人狼の名前を取得
@@ -443,57 +549,15 @@ function getLivingWolfNames() {
     .map(player => player.name);
 }
 
+
 function showRole() {
-  const role = roles[currentPlayer];
-
-  const descriptions = {
-    "人狼": "夜にプレイヤーを襲撃します。",
-    "狂人": "あなたは人狼陣営です。",
-    "占い師": "夜に1人を占えます。",
-    "騎士": "夜に1人を護衛できます。",
-    "霊媒師": "処刑された人が人狼だったか確認できます。",
-    "村人": "議論と投票で人狼を探しましょう。"
-  };
-
-  showScreen(
-    `${players[currentPlayer]}：${role}`,
-    descriptions[role],
-    "確認完了・画面を隠す",
-    () => {
-      currentPlayer++;
-      showPassScreen();
-    }
-  );
-  
-// 詳細設定がONの場合、狂人に人狼を公開
-if (
-  role === "狂人" &&
-  gameSettings.madmanKnowsWolves
-) {
-  const wolfInfo = document.createElement("div");
-  wolfInfo.className = "wolf-identity-card";
-
-  const label = document.createElement("p");
-  label.textContent = "あなたが協力する人狼";
-
-  const names = document.createElement("strong");
-  names.textContent = getLivingWolfNames().join("、");
-
-  wolfInfo.append(label, names);
-
-  // 次へ進むボタンの前に配置
-  const button = game.querySelector("button");
-  game.insertBefore(wolfInfo, button);
+  isNightPhase = true;
+  showNightAction(currentPlayer);
 }
-
-}
-
-// ------------------------------------
-// 6. 夜の開始
-// ------------------------------------
 
 
 function startNight() {
+  // 夜の行動データを初期化
   nightActions = {
     attack: null,
     guards: [],
@@ -501,27 +565,41 @@ function startNight() {
     wolfProposals: []
   };
 
+  // 生存しているプレイヤーを行動順に登録
   nightOrder = players
     .map((_, index) => index)
     .filter(index => alive[index]);
 
   nightIndex = 0;
+  privateActor = null;
 
-  if (nightCount === 0) {
-    showScreen(
-      "最初の夜",
-      "今夜、人狼は仲間の名前を確認するだけです。占い師だけが占いを行います。",
-      "夜を開始",
-      showNightPassScreen
-    );
-  } else {
-    showScreen(
-      `${nightCount + 1}回目の夜`,
-      "各プレイヤーが順番に行動します。",
-      "夜を開始",
-      showNightPassScreen
-    );
-  }
+  // 夜のターンへ移行
+  isNightPhase = true;
+
+  showNightPassScreen();
+}
+
+
+
+function showPlayerPassScreen(index, buttonText, callback) {
+  // 受け渡し画面では役職を表示しない
+  privateActor = null;
+
+  game.replaceChildren();
+
+  const name = document.createElement("h2");
+  name.className = "pass-player-name";
+  name.textContent = players[index];
+
+  const message = document.createElement("p");
+  message.className = "pass-instruction";
+  message.textContent = "さんに端末を渡してください";
+
+  const button = document.createElement("button");
+  button.textContent = buttonText;
+  button.onclick = callback;
+
+  game.append(name, message, button);
 }
 
 
@@ -534,9 +612,8 @@ function showNightPassScreen() {
 
   const index = nightOrder[nightIndex];
 
-  showScreen(
-    "夜のフェーズ",
-    `${players[index]}さんに端末を渡してください`,
+    showPlayerPassScreen(
+    index,
     "自分の行動を確認",
     () => showNightAction(index)
   );
@@ -544,9 +621,14 @@ function showNightPassScreen() {
 
 
 
+
 function showNightAction(index) {
+  // 夜の個人行動画面では役職を表示
+  isNightPhase = true;
+
   privateActor = index;
   const role = roles[index];
+
 
   // 最初の夜
   if (nightCount === 0) {
@@ -745,42 +827,51 @@ if (isSoloWolf) {
     });
   }
 
-  // 襲撃先の選択
-  const instruction = document.createElement("p");
 
-  instruction.textContent = isLastWolf
-    ? "最終的な襲撃先を選択してください。"
-    : "襲撃希望先と意見を選択してください。";
+  // 襲撃先をボタンで選択
+  const targetLabel = document.createElement("h3");
+  targetLabel.textContent = "襲撃先を選択";
+  game.appendChild(targetLabel);
 
-  game.appendChild(instruction);
+  const targetButtons = document.createElement("div");
+  targetButtons.className = "wolf-button-list";
 
-  const targetSelect = document.createElement("select");
-  targetSelect.className = "wolf-select";
-
-  const targetPlaceholder = document.createElement("option");
-  targetPlaceholder.value = "";
-  targetPlaceholder.textContent = "襲撃先を選択してください";
-  targetSelect.appendChild(targetPlaceholder);
+  const targetSelect = { value: "" };
 
   targets.forEach(target => {
-    const option = document.createElement("option");
-    option.value = String(target);
-    option.textContent = players[target];
-    targetSelect.appendChild(option);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "wolf-choice-button";
+    button.textContent = players[target];
+
+    button.onclick = () => {
+      targetSelect.value = String(target);
+
+      targetButtons.querySelectorAll("button").forEach(b => {
+        b.classList.remove("selected");
+      });
+
+      button.classList.add("selected");
+    };
+
+    targetButtons.appendChild(button);
   });
 
-  game.appendChild(targetSelect);
+  game.appendChild(targetButtons);
 
-  // 意見テンプレート
-  // 最後の人狼・単独人狼には表示しない
+  // 襲撃理由をボタンで選択
   let opinionSelect = null;
 
+  // 最後の人狼は襲撃理由を選ぶ必要がない
   if (!isLastWolf) {
-    const opinionLabel = document.createElement("p");
+    const opinionLabel = document.createElement("h3");
     opinionLabel.textContent = "襲撃したい理由";
+    game.appendChild(opinionLabel);
 
-    opinionSelect = document.createElement("select");
-    opinionSelect.className = "wolf-select";
+    const opinionButtons = document.createElement("div");
+    opinionButtons.className = "wolf-button-list";
+
+    opinionSelect = { value: "" };
 
     const templates = [
       "占い師の可能性が高い",
@@ -788,24 +879,34 @@ if (isSoloWolf) {
       "議論を主導している",
       "人狼を疑っている",
       "今後の脅威になりそう",
+      "うざい",
       "特に理由はない",
       "ほかの人狼の判断に任せる"
     ];
 
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "意見を選択してください";
-    opinionSelect.appendChild(placeholder);
-
     templates.forEach(template => {
-      const option = document.createElement("option");
-      option.value = template;
-      option.textContent = template;
-      opinionSelect.appendChild(option);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "wolf-choice-button";
+      button.textContent = template;
+
+      button.onclick = () => {
+        opinionSelect.value = template;
+
+        opinionButtons.querySelectorAll("button").forEach(b => {
+          b.classList.remove("selected");
+        });
+
+        button.classList.add("selected");
+      };
+
+      opinionButtons.appendChild(button);
     });
 
-    game.append(opinionLabel, opinionSelect);
+    game.appendChild(opinionButtons);
   }
+
+
 
   // 決定ボタン
   const button = document.createElement("button");
@@ -850,12 +951,7 @@ if (isSoloWolf) {
         comment: opinionSelect.value
       });
 
-      showScreen(
-        "仮投票完了",
-        "投票と意見を保存しました。",
-        "画面を隠して次へ",
-        nextNightPlayer
-      );
+      nextNightPlayer();
     }
   };
 
@@ -867,13 +963,9 @@ if (isSoloWolf) {
 
 // 最後の人狼が襲撃先を決めた後の画面
 function showWolfDecision() {
-  showScreen(
-    "襲撃先を決定しました",
-    "最終的な襲撃先を記録しました。画面を隠してください。",
-    "画面を隠して次へ",
-    nextNightPlayer
-  );
+  nextNightPlayer();
 }
+
 
 // ------------------------------------
 // 8. 占い師の占い
@@ -919,14 +1011,48 @@ function handleSeer(index) {
         result: isWolf
       });
 
-      showScreen(
-        "占い結果",
-        `${players[target]}さんは${
-          isWolf ? "人狼です" : "人狼ではありません"
-        }`,
-        "結果を確認・画面を隠す",
-        nextNightPlayer
-      );
+      
+
+showScreen(
+  "占い結果",
+  `${players[target]}さんは${
+    isWolf ? "人狼です" : "人狼ではありません"
+  }`,
+  "確認完了・画面を隠して次へ",
+  () => {
+    // 確認欄が重複しないようにする
+    if (document.getElementById("seer-confirm")) return;
+
+    const box = document.createElement("div");
+    box.id = "seer-confirm";
+    box.className = "seer-confirm";
+
+    const title = document.createElement("h3");
+    title.textContent = "占い結果は確認しましたか？";
+
+    const message = document.createElement("p");
+    message.textContent =
+      "次に進むと、この結果は再表示できません。";
+
+    const actions = document.createElement("div");
+    actions.className = "seer-confirm-actions";
+
+    const cancel = document.createElement("button");
+    cancel.textContent = "戻る";
+    cancel.className = "seer-confirm-cancel";
+    cancel.onclick = () => box.remove();
+
+    const proceed = document.createElement("button");
+    proceed.textContent = "確認して次へ";
+    proceed.onclick = nextNightPlayer;
+
+    actions.append(cancel, proceed);
+    box.append(title, message, actions);
+    game.appendChild(box);
+  }
+);
+
+
     }
   );
 }
@@ -983,12 +1109,7 @@ function handleKnight(index) {
       // 次の夜のために護衛先を保存
       knightHistory[index] = target;
 
-      showScreen(
-        "護衛先を決定",
-        "行動を記録しました。画面を隠してください。",
-        "画面を隠して次へ",
-        nextNightPlayer
-      );
+      nextNightPlayer();
     }
   );
 }
@@ -1021,10 +1142,20 @@ function handleMedium() {
   );
 }
 
+
 function nextNightPlayer() {
+  // 最初の夜は役職確認と行動を兼ねる
+  if (nightCount === 0) {
+    currentPlayer++;
+    showPassScreen();
+    return;
+  }
+
+  // 2回目以降の夜は従来どおり
   nightIndex++;
   showNightPassScreen();
 }
+
 
 // ------------------------------------
 // 11. 夜の結果判定
@@ -1056,9 +1187,14 @@ function resolveNight() {
 // 12. 朝の結果発表
 // ------------------------------------
 
+
 function showMorning(victim) {
+  // 朝になったら役職表示を無効にする
+  isNightPhase = false;
+
   privateActor = null;
   dayCount++;
+
 
   game.replaceChildren();
 
@@ -1227,9 +1363,8 @@ function showVotePassScreen() {
 
   const voter = voteOrder[voteIndex];
 
-  showScreen(
-    "投票",
-    `${players[voter]}さんに端末を渡してください`,
+    showPlayerPassScreen(
+    voter,
     "投票する",
     () => showVoteChoices(voter)
   );
@@ -1271,15 +1406,10 @@ function showVoteChoices(voter) {
         target: target
       });
 
-      showScreen(
-        "投票完了",
-        "投票を記録しました。",
-        "画面を隠して次へ",
-        () => {
-          voteIndex++;
-          showVotePassScreen();
-        }
-      );
+      
+voteIndex++;
+showVotePassScreen();
+
     }
   );
 }
@@ -1419,12 +1549,110 @@ function checkWinner() {
 // 20. 勝利画面
 // ------------------------------------
 
+
+
+
+function showPlayerCountSettings() {
+  privateActor = null;
+  isNightPhase = false;
+
+  game.innerHTML = `
+    <h2>プレイヤー人数の設定</h2>
+    <p>参加人数を選んでください（3〜20人）</p>
+
+    <div class="count-selector">
+      <button id="count-minus" class="count-adjust" type="button">−</button>
+
+      <div class="count-display">
+        <input
+          type="number"
+          id="new-player-count"
+          min="3"
+          max="20"
+          value="${players.length || 3}"
+        >
+        <span>人</span>
+      </div>
+
+      <button id="count-plus" class="count-adjust" type="button">＋</button>
+    </div>
+
+    <button id="confirm-player-count">次へ</button>
+  `;
+
+  const countInput = document.getElementById("new-player-count");
+  const minus = document.getElementById("count-minus");
+  const plus = document.getElementById("count-plus");
+
+  function updateButtons() {
+    const value = Number(countInput.value);
+    minus.disabled = value <= 3;
+    plus.disabled = value >= 20;
+  }
+
+  minus.onclick = () => {
+    countInput.value = Math.max(3, Number(countInput.value) - 1);
+    updateButtons();
+  };
+
+  plus.onclick = () => {
+    countInput.value = Math.min(20, Number(countInput.value) + 1);
+    updateButtons();
+  };
+
+  countInput.addEventListener("input", updateButtons);
+  updateButtons();
+
+  document.getElementById("confirm-player-count").onclick = () => {
+    const count = Number(countInput.value);
+
+    if (!Number.isInteger(count) || count < 3 || count > 20) {
+      alert("人数は3〜20人で設定してください");
+      return;
+    }
+
+    const previousNames = [...players];
+
+    showNameForm(count);
+
+    document.querySelectorAll(".name-input").forEach((input, index) => {
+      input.value = previousNames[index] ?? "";
+    });
+  };
+}
+
+
+
+
 function showWinner(winner) {
   privateActor = null;
-  showScreen(
-    "ゲーム終了",
-    `${winner}の勝利です！`,
-    "新しいゲームを開始",
-    () => location.reload()
-  );
+  isNightPhase = false;
+
+  game.replaceChildren();
+
+  const title = document.createElement("h2");
+  title.textContent = "ゲーム終了";
+
+  const result = document.createElement("h3");
+  result.textContent = `${winner}の勝利です！`;
+
+  // 前回の設定を引き継ぐ
+  const retryButton = document.createElement("button");
+  retryButton.textContent = "設定を引き継いで遊ぶ";
+  retryButton.onclick = () => {
+    showRoleSettings();
+  };
+
+  // 人数・名前から設定し直す
+  const changeButton = document.createElement("button");
+  changeButton.textContent = "人数を変更して遊ぶ";
+  changeButton.className = "secondary-button";
+  changeButton.onclick = () => {
+    showPlayerCountSettings();
+  };
+
+  game.append(title, result, retryButton, changeButton);
 }
+
+
+

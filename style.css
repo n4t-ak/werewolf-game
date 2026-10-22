@@ -1095,3 +1095,181 @@ textarea:focus-visible {
     transition: none;
   }
 }
+
+
+/* 昼の議論タイマー */
+#game .discussion-timer {
+  width: 100%;
+  margin: 24px 0;
+  padding: 24px 16px;
+  background: #242b3a;
+  border: 1px solid #556078;
+  border-radius: 18px;
+  text-align: center;
+}
+
+#game .discussion-timer > p {
+  color: #b0b9cb;
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+#game .discussion-timer-display {
+  color: #ffffff;
+  font-size: clamp(44px, 12vw, 64px);
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 20px;
+}
+
+#game .discussion-timer-display.time-up {
+  color: #ff829a;
+}
+
+#game .discussion-add-time {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px;
+  background: #303b57;
+  color: #ffffff;
+  border: 1px solid #65708b;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#game .discussion-add-time:hover {
+  background: #84354b;
+  border-color: #e34f62;
+}
+
+@media (max-width: 380px) {
+  #game .discussion-timer {
+    padding: 20px 12px;
+  }
+
+  #game .discussion-timer-display {
+    font-size: 42px;
+    letter-spacing: 1px;
+  }
+}
+
+
+/* 占い結果の表示 */
+#game .seer-result-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin: 26px 0;
+  text-align: center;
+}
+
+/* 占った相手の名前 */
+#game .seer-result-text span {
+  display: block;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* 判定結果だけ赤色で強調 */
+#game .seer-result-text strong {
+  display: block;
+  color: #ff617b;
+  font-size: clamp(27px, 7vw, 42px);
+  font-weight: 900;
+  line-height: 1.4;
+  text-shadow: 0 0 18px rgba(255, 80, 110, 0.2);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 380px) {
+  #game .seer-result-text strong {
+    font-size: 27px;
+  }
+}
+
+
+/* 人狼の仲間確認画面 */
+#game .wolf-teammates {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 26px 0;
+  text-align: center;
+}
+
+/* 仲間の人狼という説明 */
+#game .wolf-teammates span {
+  color: #b0b9cb;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* 仲間のプレイヤー名 */
+#game .wolf-teammates strong {
+  display: block;
+  color: #ff617b;
+  font-size: clamp(28px, 7vw, 42px);
+  font-weight: 900;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 18px rgba(255, 80, 110, 0.2);
+}
+
+
+/* タイマー操作ボタンを横並びにする */
+#game .discussion-timer-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+/* 一時停止・再開ボタン */
+#game .discussion-pause {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 8px;
+  background: #84354b;
+  color: #ffffff;
+  border: 1px solid #e34f62;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 既存の＋1分ボタンも高さを統一 */
+#game .discussion-add-time {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+}
+
+#game .discussion-pause:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 380px) {
+  #game .discussion-timer-controls {
+    gap: 8px;
+  }
+
+  #game .discussion-pause,
+  #game .discussion-add-time {
+    font-size: 13px;
+    padding: 10px 6px;
+  }
+}

@@ -10,6 +10,9 @@ let currentPlayer = 0;
 let nightCount = 0;
 let dayCount = 0;
 
+let discussionTimerId = null;
+
+
 let nightActions = {};
 let nightOrder = [];
 let nightIndex = 0;
@@ -649,10 +652,33 @@ function showNightAction(index) {
         ? `仲間の人狼：${teammates.map(i => players[i]).join("、")}`
         : "あなた以外に人狼はいません。";
 
-      showRandomWait(
-        "人狼：仲間の確認",
-        message
-      );
+      
+showRandomWait(
+  "人狼：仲間の確認",
+  message
+);
+
+// 仲間の名前を大きな赤文字で強調
+if (teammates.length > 0) {
+  const messageElement = game.querySelector("h2 + p");
+
+  if (messageElement) {
+    messageElement.className = "wolf-teammates";
+
+    messageElement.replaceChildren();
+
+    const label = document.createElement("span");
+    label.textContent = "仲間の人狼";
+
+    const names = document.createElement("strong");
+    names.textContent = teammates
+      .map(i => players[i])
+      .join("、");
+
+    messageElement.append(label, names);
+  }
+}
+
 
     
 } else if (
@@ -1053,6 +1079,24 @@ showScreen(
 );
 
 
+// 占い結果の文字を強調表示
+const resultParagraph = game.querySelector("p");
+
+if (resultParagraph) {
+  resultParagraph.className = "seer-result-text";
+
+  const nameText = document.createElement("span");
+  nameText.textContent = `${players[target]}さんの判定結果`;
+
+  const roleText = document.createElement("strong");
+  roleText.textContent = isWolf
+    ? "人狼"
+    : "人狼ではありません";
+
+  resultParagraph.replaceChildren(nameText, roleText);
+}
+
+
     }
   );
 }
@@ -1255,6 +1299,9 @@ function showMorning(victim) {
 
 
 function startDay() {
+  clearInterval(discussionTimerId);
+  discussionTimerId = null;
+
   game.replaceChildren();
 
   const title = document.createElement("h2");
@@ -1264,19 +1311,132 @@ function startDay() {
   message.textContent =
     "生存者全員で話し合い、人狼だと思う人を探してください。";
 
-  // 通常の投票ボタン
+  const timerBox = document.createElement("div");
+  timerBox.className = "discussion-timer";
+
+  const timerLabel = document.createElement("p");
+  timerLabel.textContent = "議論の残り時間";
+
+  const timerDisplay = document.createElement("div");
+  timerDisplay.className = "discussion-timer-display";
+
+  // タイマー操作ボタンの入れ物
+  const controls = document.createElement("div");
+  controls.className = "discussion-timer-controls";
+
+  const addTimeButton = document.createElement("button");
+  addTimeButton.textContent = "＋1分";
+  addTimeButton.className = "discussion-add-time";
+
+  const pauseButton = document.createElement("button");
+  pauseButton.textContent = "一時停止";
+  pauseButton.className = "discussion-pause";
+
+  // 初期時間は3分
+  let remainingMs = 3 * 60 * 1000;
+  let lastTick = Date.now();
+  let isPaused = false;
+
+  function updateTimer() {
+    const now = Date.now();
+
+    if (!isPaused && remainingMs > 0) {
+      remainingMs = Math.max(0, remainingMs - (now - lastTick));
+    }
+
+    lastTick = now;
+
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+
+    timerDisplay.textContent =
+      `${String(minutes).padStart(2, "0")}:` +
+      `${String(seconds).padStart(2, "0")}`;
+
+    timerDisplay.classList.toggle(
+      "time-up",
+      remainingSeconds === 0
+    );
+
+    if (remainingSeconds === 0) {
+      timerLabel.textContent = "時間終了";
+      pauseButton.disabled = true;
+      clearInterval(discussionTimerId);
+      discussionTimerId = null;
+    } else {
+      timerLabel.textContent = isPaused
+        ? "一時停止中"
+        : "議論の残り時間";
+
+      pauseButton.disabled = false;
+    }
+  }
+
+  // タイマーの一時停止・再開
+  pauseButton.onclick = () => {
+    updateTimer();
+
+    isPaused = !isPaused;
+    lastTick = Date.now();
+
+    pauseButton.textContent = isPaused
+      ? "再開"
+      : "一時停止";
+
+    updateTimer();
+  };
+
+  // 残り時間を1分追加
+  addTimeButton.onclick = () => {
+    updateTimer();
+
+    remainingMs += 60 * 1000;
+    lastTick = Date.now();
+
+    // 時間終了後は追加すると再開
+    if (discussionTimerId === null) {
+      isPaused = false;
+      pauseButton.textContent = "一時停止";
+      discussionTimerId = setInterval(updateTimer, 250);
+    }
+
+    updateTimer();
+  };
+
+  controls.append(addTimeButton, pauseButton);
+  timerBox.append(timerLabel, timerDisplay, controls);
+
   const voteButton = document.createElement("button");
   voteButton.textContent = "議論終了・投票開始";
-  voteButton.onclick = startVoting;
+  voteButton.onclick = () => {
+    clearInterval(discussionTimerId);
+    discussionTimerId = null;
+    startVoting();
+  };
 
-  // 投票スキップボタン
   const skipButton = document.createElement("button");
   skipButton.textContent = "投票をスキップ";
   skipButton.className = "skip-button";
-  skipButton.onclick = skipVoting;
+  skipButton.onclick = () => {
+    clearInterval(discussionTimerId);
+    discussionTimerId = null;
+    skipVoting();
+  };
 
-  game.append(title, message, voteButton, skipButton);
+  game.append(
+    title,
+    message,
+    timerBox,
+    voteButton,
+    skipButton
+  );
+
+  updateTimer();
+  discussionTimerId = setInterval(updateTimer, 250);
 }
+
+
 
 
 function skipVoting() {

@@ -724,61 +724,61 @@ function collectOnlineSettings() {
   };
 }
 
-// ホストだけが設定を書き込む
-function saveOnlineSettings() {
-  if (!currentRoom || !onlineIsHost) {
-    return Promise.resolve();
-  }
 
-  if (validateOnlineRoles()) {
+function saveOnlineSettings() {
+  // ホストだけが設定を保存
+  if (!currentRoom || !onlineIsHost) {
     return Promise.resolve();
   }
 
   const data = collectOnlineSettings();
 
+  // 未入力や不正な人数は保存しない
+  const counts = Object.values(data.roleCounts);
+
+  if (
+    counts.some(count =>
+      !Number.isInteger(count) ||
+      count < 0 ||
+      count > 20
+    )
+  ) {
+    return Promise.resolve();
+  }
+
+  // ゲーム開始が可能かどうかに関係なく設定を保存
   settingsSavePromise = settingsSavePromise
     .catch(() => {})
-    .then(() =>
-      set(
+    .then(async () => {
+      await set(
         ref(db, `rooms/${currentRoom}/settings`),
         data
-      )
-    );
+      );
+
+      console.log("設定保存成功：", data);
+    });
 
   settingsSavePromise.catch(error => {
     console.error("設定保存エラー：", error);
-    showStatus("設定を保存できませんでした。");
+    showStatus(
+      "設定を保存できませんでした。通信状態を確認してください。"
+    );
   });
 
   return settingsSavePromise;
 }
 
+
 // 細かい入力操作のたびに通信しない
+
 function scheduleOnlineSettingsSave() {
   clearTimeout(settingsSaveTimer);
 
   settingsSaveTimer = setTimeout(() => {
-    if (validateOnlineRoles()) return;
     saveOnlineSettings();
-  }, 400);
+  }, 300);
 }
 
-// ホストの入力変更を監視
-document.querySelectorAll(".online-role-count")
-  .forEach(input => {
-    input.addEventListener(
-      "input",
-      scheduleOnlineSettingsSave
-    );
-  });
-
-ONLINE_EXTRA_SETTINGS.forEach(setting => {
-  document.getElementById(setting.id)
-    .addEventListener("change", () => {
-      validateOnlineRoles();
-      scheduleOnlineSettingsSave();
-    });
-});
 
 // 参加者用の閲覧専用画面を更新
 function renderOnlineGuestSettings(settings) {
@@ -865,10 +865,11 @@ function updateOnlineSettingsVisibility() {
   roleSettingsBox.hidden = !inLobby || !onlineIsHost;
 }
 
-// 設定データだけを監視して通信量を抑える
+
 function watchOnlineSettings() {
   if (stopSettingsListener) {
     stopSettingsListener();
+    stopSettingsListener = null;
   }
 
   const settingsRef = ref(
@@ -881,6 +882,12 @@ function watchOnlineSettings() {
     snapshot => {
       sharedOnlineSettings = snapshot.val();
 
+      console.log(
+        "設定データを受信：",
+        sharedOnlineSettings
+      );
+
+      // 参加者側の画面を更新
       if (!onlineIsHost) {
         renderOnlineGuestSettings(
           sharedOnlineSettings
@@ -889,10 +896,13 @@ function watchOnlineSettings() {
     },
     error => {
       console.error("設定同期エラー：", error);
-      showStatus("ゲーム設定を読み込めませんでした。");
+      showStatus(
+        "設定を読み込めませんでした。ページを再読み込みしてください。"
+      );
     }
   );
 }
+
 
 
 /* ========================================

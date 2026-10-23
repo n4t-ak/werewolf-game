@@ -1193,3 +1193,51 @@ input[type="number"] { width: 100px; }
     padding: 10px 5px;
   }
 }
+
+/* 昼の投票画面 */
+#online-vote-screen,
+#online-vote-result-screen {
+  padding: 18px 0;
+  text-align: center;
+}
+#online-vote-screen h2,
+#online-vote-result-screen h2 {
+  color: #ffe7b4;
+  font-size: 28px;
+}
+#online-vote-target {
+  display: block;
+  width: 100%;
+  margin: 14px 0 20px;
+  padding: 14px;
+  background: #182133;
+  color: #ffffff;
+  border: 1px solid #65708b;
+  border-radius: 10px;
+  font-size: 17px;
+}
+#online-vote-message {
+  color: #bfc9dc;
+  margin: 18px 0;
+  line-height: 1.7;
+}
+#online-vote-count {
+  color: #ffe7b4;
+  font-size: 18px;
+  margin: 24px 0;
+}
+#online-vote-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+#online-execution-result {
+  margin: 26px 0;
+  padding: 20px 12px;
+  background: #402936;
+  border: 2px solid #e34f62;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 21px;
+}

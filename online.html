@@ -13,7 +13,8 @@
 <body>
 
 
-<script type="module" src="./online.js?v=20261024-1"></script>
+<script type="module" src="./online.js?v=20261024-2"></script>
+
 
 
 
@@ -287,7 +288,43 @@
   </p>
   <h3>参加者</h3>
   <div id="online-discussion-members"></div>
+
+<button id="online-start-vote" type="button" hidden>
+  議論を終了して投票へ進む
+</button>
+
 </div>
+
+<!-- 昼の投票画面 -->
+<div id="online-vote-screen" hidden>
+  <h2>昼の投票</h2>
+  <p>処刑したいプレイヤーを1人選んでください。</p>
+  <label class="field-label" for="online-vote-target">
+    投票先
+  </label>
+  <select id="online-vote-target">
+    <option value="">プレイヤーを選択</option>
+  </select>
+  <button id="online-submit-vote" type="button">
+    投票を確定する
+  </button>
+  <p id="online-vote-message" role="status"></p>
+  <h3 id="online-vote-count">投票完了：0 / 0人</h3>
+  <button id="online-finish-vote" type="button" hidden disabled>
+    投票を集計する
+  </button>
+</div>
+
+<!-- 投票・処刑結果画面 -->
+<div id="online-vote-result-screen" hidden>
+  <h2>投票結果</h2>
+  <div id="online-vote-results"></div>
+  <h3 id="online-execution-result"></h3>
+  <p class="online-wait-message">
+    他のプレイヤーの役職は公開されません。
+  </p>
+</div>
+
 
         <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>

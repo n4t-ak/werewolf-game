@@ -855,6 +855,14 @@ if (meta.phase === "discussion") {
 }
 
 
+if (meta.phase === "voting") {
+  enterOnlineVoting();
+}
+
+if (meta.phase === "voteResult") {
+  enterOnlineVoteResult();
+}
+
       
     },
     
@@ -1866,6 +1874,11 @@ function enterOnlineDiscussion(meta) {
   dayScreen.hidden = true;
   discussionScreen.hidden = false;
 
+voteScreen.hidden = true;
+voteResultScreen.hidden = true;
+startVoteButton.hidden = !onlineIsHost;
+startVoteButton.disabled = false;
+
   renderDiscussionMembers();
   discussionStartedAt = Number(meta.discussionStartedAt) || null;
   discussionControlsBox.hidden = !onlineIsHost;
@@ -2009,3 +2022,304 @@ window.addEventListener("pagehide", () => {
   }
 });
 
+
+/* ========================================
+   昼の投票・集計・処刑結果
+======================================== */
+
+const startVoteButton = document.getElementById("online-start-vote");
+const voteScreen = document.getElementById("online-vote-screen");
+const voteTarget = document.getElementById("online-vote-target");
+const submitVoteButton = document.getElementById("online-submit-vote");
+const voteMessage = document.getElementById("online-vote-message");
+const voteCount = document.getElementById("online-vote-count");
+const finishVoteButton = document.getElementById("online-finish-vote");
+const voteResultScreen = document.getElementById("online-vote-result-screen");
+const voteResults = document.getElementById("online-vote-results");
+const executionResult = document.getElementById("online-execution-result");
+
+let stopVoteReadyListener = null;
+let stopMyVoteListener = null;
+let stopVoteResultListener = null;
+let myVoteSubmitted = false;
+let votingMembers = [];
+
+function getVotingName(uid) {
+  const found = currentMembers.find(([id]) => id === uid);
+  return found ? found[1].name : "不明なプレイヤー";
+}
+
+function renderVoteTargets() {
+  voteTarget.replaceChildren();
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "プレイヤーを選択";
+  voteTarget.appendChild(placeholder);
+
+  votingMembers.forEach(([uid, member]) => {
+    if (uid === currentUid) return;
+
+    const option = document.createElement("option");
+    option.value = uid;
+    option.textContent = member.name;
+    voteTarget.appendChild(option);
+  });
+}
+
+function enterOnlineVoting() {
+  entryScreen.hidden = true;
+  lobbyScreen.hidden = true;
+  roleRevealBox.hidden = true;
+  nightScreen.hidden = true;
+  dayScreen.hidden = true;
+  discussionScreen.hidden = true;
+  voteResultScreen.hidden = true;
+  voteScreen.hidden = false;
+
+  if (discussionInterval !== null) {
+    clearInterval(discussionInterval);
+    discussionInterval = null;
+  }
+  if (stopDiscussionControlsListener) {
+    stopDiscussionControlsListener();
+    stopDiscussionControlsListener = null;
+  }
+
+  votingMembers = [...currentMembers];
+  renderVoteTargets();
+
+  finishVoteButton.hidden = !onlineIsHost;
+  finishVoteButton.disabled = true;
+  voteMessage.textContent = "投票先を選択してください。";
+
+  if (stopMyVoteListener) stopMyVoteListener();
+
+  stopMyVoteListener = onValue(
+    ref(db, `rooms/${currentRoom}/votes/${currentUid}`),
+    snapshot => {
+      myVoteSubmitted = snapshot.exists();
+      if (myVoteSubmitted) {
+        voteTarget.disabled = true;
+        submitVoteButton.disabled = true;
+        submitVoteButton.textContent = "投票済み";
+        voteMessage.textContent = "投票しました。集計を待っています。";
+      } else {
+        voteTarget.disabled = false;
+        submitVoteButton.disabled = false;
+        submitVoteButton.textContent = "投票を確定する";
+      }
+    },
+    error => {
+      console.error("自分の投票確認エラー:", error);
+      voteMessage.textContent = "投票状況の取得エラー：" + error.message;
+    }
+  );
+
+  if (stopVoteReadyListener) stopVoteReadyListener();
+
+  stopVoteReadyListener = onValue(
+    ref(db, `rooms/${currentRoom}/voteReady`),
+    snapshot => {
+      const ready = snapshot.val() || {};
+      const total = votingMembers.length;
+      const count = votingMembers.filter(
+        ([uid]) => ready[uid] === true
+      ).length;
+
+      voteCount.textContent = `投票完了：${count} / ${total}人`;
+      finishVoteButton.disabled =
+        !onlineIsHost || total < 3 || count !== total;
+    },
+    error => {
+      console.error("投票完了状況エラー:", error);
+      voteCount.textContent = "投票状況を取得できません。";
+    }
+  );
+}
+
+startVoteButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "discussion") return;
+
+  startVoteButton.disabled = true;
+  try {
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/phase`),
+      "voting"
+    );
+  } catch (error) {
+    console.error("投票開始エラー:", error);
+    showStatus("投票を開始できません：" + error.message);
+    startVoteButton.disabled = false;
+  }
+});
+
+submitVoteButton.addEventListener("click", async () => {
+  if (currentPhase !== "voting" || myVoteSubmitted) return;
+
+  const targetUid = voteTarget.value;
+  if (!targetUid || targetUid === currentUid) {
+    voteMessage.textContent = "自分以外の投票先を選択してください。";
+    return;
+  }
+
+  submitVoteButton.disabled = true;
+  voteTarget.disabled = true;
+  voteMessage.textContent = "投票を保存しています…";
+
+  try {
+    const myVoteRef = ref(
+      db, `rooms/${currentRoom}/votes/${currentUid}`
+    );
+
+    const existing = await get(myVoteRef);
+
+    if (existing.exists()) {
+      if (existing.val() !== targetUid) {
+        throw new Error("投票先は変更できません。");
+      }
+    } else {
+      await set(myVoteRef, targetUid);
+    }
+
+    await set(
+      ref(db, `rooms/${currentRoom}/voteReady/${currentUid}`),
+      true
+    );
+
+    myVoteSubmitted = true;
+    submitVoteButton.textContent = "投票済み";
+    voteMessage.textContent = "投票しました。集計を待っています。";
+  } catch (error) {
+    console.error("投票保存エラー:", error);
+    voteMessage.textContent = "投票エラー：" + error.message;
+    submitVoteButton.disabled = false;
+    voteTarget.disabled = false;
+  }
+});
+
+finishVoteButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "voting") return;
+
+  finishVoteButton.disabled = true;
+
+  try {
+    const [membersSnap, votesSnap] = await Promise.all([
+      get(ref(db, `rooms/${currentRoom}/members`)),
+      get(ref(db, `rooms/${currentRoom}/votes`))
+    ]);
+
+    const members = membersSnap.val() || {};
+    const votes = votesSnap.val() || {};
+    const uids = Object.keys(members);
+
+    if (uids.length < 3 || !uids.every(uid => votes[uid])) {
+      throw new Error("まだ全員の投票が終わっていません。");
+    }
+
+    const counts = {};
+    uids.forEach(uid => { counts[uid] = 0; });
+
+    uids.forEach(uid => {
+      const targetUid = votes[uid];
+      if (targetUid === uid || !(targetUid in members)) {
+        throw new Error("不正な投票先があります。");
+      }
+      counts[targetUid]++;
+    });
+
+    const maxVotes = Math.max(...Object.values(counts));
+    const topPlayers = Object.keys(counts).filter(
+      uid => counts[uid] === maxVotes
+    );
+
+    const tie = topPlayers.length > 1;
+    const targetUid = tie ? "" : topPlayers[0];
+
+    await set(
+      ref(db, `rooms/${currentRoom}/voteResult`),
+      { counts, tie, targetUid }
+    );
+
+    if (!tie) {
+      await set(
+        ref(db, `rooms/${currentRoom}/eliminated/${targetUid}`),
+        true
+      );
+    }
+
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/phase`),
+      "voteResult"
+    );
+  } catch (error) {
+    console.error("投票集計エラー:", error);
+    voteMessage.textContent = "集計エラー：" + error.message;
+    finishVoteButton.disabled = false;
+  }
+});
+
+function renderOnlineVoteResult(result) {
+  voteResults.replaceChildren();
+
+  const counts = result.counts || {};
+  const sorted = Object.entries(counts).sort(
+    (a, b) => b[1] - a[1]
+  );
+
+  sorted.forEach(([uid, count]) => {
+    const row = document.createElement("div");
+    row.className = "online-member";
+
+    const name = document.createElement("strong");
+    name.textContent = getVotingName(uid);
+
+    const votes = document.createElement("span");
+    votes.textContent = `${count}票`;
+
+    row.append(name, votes);
+    voteResults.appendChild(row);
+  });
+
+  if (result.tie) {
+    executionResult.textContent = "同票のため、処刑者なし";
+  } else {
+    executionResult.textContent =
+      `${getVotingName(result.targetUid)} が処刑されました。`;
+  }
+}
+
+function enterOnlineVoteResult() {
+  entryScreen.hidden = true;
+  lobbyScreen.hidden = true;
+  roleRevealBox.hidden = true;
+  nightScreen.hidden = true;
+  dayScreen.hidden = true;
+  discussionScreen.hidden = true;
+  voteScreen.hidden = true;
+  voteResultScreen.hidden = false;
+
+  if (stopVoteResultListener) stopVoteResultListener();
+
+  stopVoteResultListener = onValue(
+    ref(db, `rooms/${currentRoom}/voteResult`),
+    snapshot => {
+      if (snapshot.exists()) {
+        renderOnlineVoteResult(snapshot.val());
+      } else {
+        executionResult.textContent = "集計結果を読み込んでいます。";
+      }
+    },
+    error => {
+      console.error("集計結果取得エラー:", error);
+      executionResult.textContent =
+        "集計結果を取得できません：" + error.message;
+    }
+  );
+}
+
+window.addEventListener("pagehide", () => {
+  if (stopVoteReadyListener) stopVoteReadyListener();
+  if (stopMyVoteListener) stopMyVoteListener();
+  if (stopVoteResultListener) stopVoteResultListener();
+});

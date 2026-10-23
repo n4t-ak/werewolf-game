@@ -262,11 +262,43 @@
     役職を確認しました
   </button>
 
+  <button id="online-go-night" type="button" hidden disabled>
+  全員の確認完了・初夜へ進む
+</button>
+
   <h3 id="online-ready-count">確認状況</h3>
   <div id="online-ready-members"></div>
 
   <p class="online-wait-message">
     全員の役職確認が終了するまで待機してください。
+  </p>
+</div>
+
+<!-- 初夜の行動画面 -->
+<div id="online-night-screen" hidden>
+  <h2>初夜</h2>
+
+  <p id="online-night-role"></p>
+  <p id="online-night-message"></p>
+
+  <div id="online-night-action-area" hidden>
+    <label class="field-label" for="online-night-target">
+      行動する相手
+    </label>
+
+    <select id="online-night-target">
+      <option value="">相手を選択してください</option>
+    </select>
+
+    <button id="online-submit-night" type="button">
+      行動を確定する
+    </button>
+  </div>
+
+  <p id="online-night-result" role="status"></p>
+
+  <p class="online-wait-message">
+    全員の行動が終わるまで待機してください。
   </p>
 </div>
 

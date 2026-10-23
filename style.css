@@ -2345,3 +2345,58 @@ textarea:focus-visible {
 #online-game [hidden] {
   display: none !important;
 }
+
+
+/* ========================================
+   オンライン人狼：初夜
+======================================== */
+
+#online-night-screen {
+  text-align: center;
+}
+
+#online-night-role {
+  margin: 20px 0;
+  padding: 15px;
+  background: #24314a;
+  border: 1px solid #65708b;
+  border-radius: 12px;
+  color: #ffd166;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+#online-night-message {
+  color: #ffffff;
+  line-height: 1.8;
+}
+
+#online-night-action-area {
+  margin: 24px 0;
+}
+
+#online-night-target {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  margin: 12px 0 18px;
+  border: 1px solid #65708b;
+  border-radius: 10px;
+  background: #182133;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+#online-night-result {
+  color: #90e3b3;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+#online-go-night {
+  margin-top: 18px;
+}
+
+#online-game [hidden] {
+  display: none !important;
+}

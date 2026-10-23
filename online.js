@@ -652,19 +652,29 @@ document.getElementById("online-ready-button")
     }
   });
 
+
 function watchOnlineReady() {
-  if (stopReadyListener) stopReadyListener();
+  if (stopReadyListener) {
+    stopReadyListener();
+  }
 
   stopReadyListener = onValue(
     ref(db, `rooms/${currentRoom}/ready`),
     snapshot => {
       const ready = snapshot.val() || {};
+
       const count = Object.values(ready)
-        .filter(Boolean).length;
+        .filter(value => value === true)
+        .length;
+
+      const total = Number(
+        memberCount.dataset.playerCount || 0
+      );
 
       document.getElementById(
         "online-ready-count"
-      ).textContent = `役職確認済み：${count}人`;
+      ).textContent =
+        `役職確認済み：${count} / ${total}人`;
 
       const button =
         document.getElementById("online-ready-button");
@@ -673,9 +683,22 @@ function watchOnlineReady() {
         button.disabled = true;
         button.textContent = "確認完了";
       }
+
+      // ホストだけが初夜へ進める
+      updateGoNightButton();
+
+      goNightButton.disabled =
+        !onlineIsHost ||
+        total < 3 ||
+        count !== total;
+    },
+    error => {
+      console.error("役職確認の同期エラー：", error);
+      showStatus("役職の確認状況を取得できませんでした。");
     }
   );
 }
+
 
 // 現在のフェーズを監視
 function watchOnlinePhase() {
@@ -707,6 +730,7 @@ if (meta.phase === "lobby") {
 
 
       if (meta.phase === "firstNight") {
+        updateGoNightButton();
         // 待機画面から役職確認画面へ
         document.getElementById(
           "entry-screen"
@@ -737,6 +761,10 @@ if (meta.phase === "lobby") {
 
         watchOnlineReady();
       }
+      if (meta.phase === "night") {
+  enterOnlineNight();
+}
+      
     },
     error => {
       showStatus("進行同期エラー：" + error.message);
@@ -1188,3 +1216,289 @@ document.getElementById("back-from-join")
   .addEventListener("click", () => {
     switchOnlineEntryScreen("menu");
   });
+
+// ========================================
+// 初夜の行動
+// ========================================
+
+const goNightButton =
+  document.getElementById("online-go-night");
+
+const nightScreen =
+  document.getElementById("online-night-screen");
+
+const nightRole =
+  document.getElementById("online-night-role");
+
+const nightMessage =
+  document.getElementById("online-night-message");
+
+const nightActionArea =
+  document.getElementById("online-night-action-area");
+
+const nightTarget =
+  document.getElementById("online-night-target");
+
+const nightSubmitButton =
+  document.getElementById("online-submit-night");
+
+const nightResult =
+  document.getElementById("online-night-result");
+
+let stopNightRoleListener = null;
+let stopNightMembersListener = null;
+let stopMyNightActionListener = null;
+let myNightRole = null;
+let nightActionSaved = false;
+
+const NIGHT_ACTION_ROLES = {
+  "人狼": {
+    description: "襲撃する相手を選んでください。"
+  },
+  "占い師": {
+    description: "占う相手を選んでください。"
+  },
+  "騎士": {
+    description: "護衛する相手を選んでください。"
+  },
+  "怪盗": {
+    description: "役職を交換する相手を選んでください。"
+  }
+};
+
+// 初夜へ進むボタンをホストだけに表示
+function updateGoNightButton() {
+  if (!currentRoom || currentPhase !== "firstNight") {
+    goNightButton.hidden = true;
+    return;
+  }
+
+  goNightButton.hidden = !onlineIsHost;
+}
+
+// ホストが全員の確認完了をチェックして初夜へ進める
+goNightButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "firstNight") {
+    return;
+  }
+
+  goNightButton.disabled = true;
+
+  try {
+    const [membersSnap, readySnap] = await Promise.all([
+      get(ref(db, `rooms/${currentRoom}/members`)),
+      get(ref(db, `rooms/${currentRoom}/ready`))
+    ]);
+
+    const memberUids = Object.keys(
+      membersSnap.val() || {}
+    );
+
+    const ready = readySnap.val() || {};
+
+    if (
+      memberUids.length < 3 ||
+      !memberUids.every(uid => ready[uid] === true)
+    ) {
+      showStatus(
+        "全員が役職を確認するまで進めません。"
+      );
+      return;
+    }
+
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/phase`),
+      "night"
+    );
+
+    showStatus("初夜を開始しました。");
+
+  } catch (error) {
+    console.error("初夜への移行エラー：", error);
+    showStatus("初夜を開始できませんでした。");
+  } finally {
+    if (currentPhase === "firstNight") {
+      goNightButton.disabled = false;
+    }
+  }
+});
+
+// プレイヤーの役職に応じた画面を表示
+function renderNightRole(role) {
+  myNightRole = role;
+  nightRole.textContent = `あなたの役職：${role}`;
+
+  const action = NIGHT_ACTION_ROLES[role];
+
+  if (!action) {
+    nightActionArea.hidden = true;
+    nightMessage.textContent =
+      "初夜に選択する行動はありません。";
+    nightResult.textContent =
+      "ほかのプレイヤーの行動を待っています。";
+    return;
+  }
+
+  nightMessage.textContent = action.description;
+  nightActionArea.hidden = nightActionSaved;
+  nightSubmitButton.disabled = false;
+}
+
+// 選択可能な参加者を表示する
+function watchNightTargets() {
+  if (stopNightMembersListener) {
+    stopNightMembersListener();
+  }
+
+  stopNightMembersListener = onValue(
+    ref(db, `rooms/${currentRoom}/members`),
+    snapshot => {
+      const members = snapshot.val() || {};
+      const previousValue = nightTarget.value;
+
+      nightTarget.replaceChildren();
+
+      const placeholder =
+        document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent =
+        "相手を選択してください";
+
+      nightTarget.appendChild(placeholder);
+
+      Object.entries(members).forEach(([uid, member]) => {
+        // 初夜では自分自身を選べない
+        if (uid === currentUid) return;
+
+        const option =
+          document.createElement("option");
+        option.value = uid;
+        option.textContent = member.name;
+
+        nightTarget.appendChild(option);
+      });
+
+      if (
+        [...nightTarget.options].some(
+          option => option.value === previousValue
+        )
+      ) {
+        nightTarget.value = previousValue;
+      }
+    },
+    error => {
+      console.error("対象者一覧の取得エラー：", error);
+      nightResult.textContent =
+        "対象者一覧を読み込めませんでした。";
+    }
+  );
+}
+
+// 自分の保存済み行動のみを監視
+function watchMyNightAction() {
+  if (stopMyNightActionListener) {
+    stopMyNightActionListener();
+  }
+
+  stopMyNightActionListener = onValue(
+    ref(
+      db,
+      `rooms/${currentRoom}/nightActions/${currentUid}`
+    ),
+    snapshot => {
+      nightActionSaved = snapshot.exists();
+
+      if (nightActionSaved) {
+        nightActionArea.hidden = true;
+        nightResult.textContent =
+          "行動を確定しました。ほかの参加者を待っています。";
+      } else if (myNightRole in NIGHT_ACTION_ROLES) {
+        nightActionArea.hidden = false;
+      }
+    },
+    error => {
+      console.error("行動状態の取得エラー：", error);
+      nightResult.textContent =
+        "行動の状態を確認できませんでした。";
+    }
+  );
+}
+
+// 初夜画面へ切り替え
+function enterOnlineNight() {
+  entryScreen.hidden = true;
+  lobbyScreen.hidden = true;
+  roleRevealBox.hidden = true;
+  nightScreen.hidden = false;
+
+  nightResult.textContent = "役職を確認しています…";
+  nightActionArea.hidden = true;
+
+  if (stopNightRoleListener) {
+    stopNightRoleListener();
+  }
+
+  stopNightRoleListener = onValue(
+    ref(db, `rooms/${currentRoom}/roles/${currentUid}`),
+    snapshot => {
+      if (snapshot.exists()) {
+        renderNightRole(snapshot.val());
+      }
+    },
+    error => {
+      console.error("初夜の役職取得エラー：", error);
+      nightResult.textContent =
+        "役職を読み込めませんでした。";
+    }
+  );
+
+  watchNightTargets();
+  watchMyNightAction();
+}
+
+// 行動を確定してFirebaseへ保存
+nightSubmitButton.addEventListener("click", async () => {
+  if (
+    currentPhase !== "night" ||
+    !myNightRole ||
+    !(myNightRole in NIGHT_ACTION_ROLES)
+  ) {
+    return;
+  }
+
+  const targetUid = nightTarget.value;
+
+  if (!targetUid || targetUid === currentUid) {
+    nightResult.textContent =
+      "行動する相手を選択してください。";
+    return;
+  }
+
+  nightSubmitButton.disabled = true;
+  nightResult.textContent = "行動を保存しています…";
+
+  try {
+    await set(
+      ref(
+        db,
+        `rooms/${currentRoom}/nightActions/${currentUid}`
+      ),
+      {
+        targetUid,
+        role: myNightRole
+      }
+    );
+
+    nightActionSaved = true;
+    nightActionArea.hidden = true;
+
+    nightResult.textContent =
+      "行動を確定しました。";
+
+  } catch (error) {
+    console.error("初夜の行動保存エラー：", error);
+    nightResult.textContent =
+      "行動を保存できませんでした。もう一度お試しください。";
+    nightSubmitButton.disabled = false;
+  }
+});

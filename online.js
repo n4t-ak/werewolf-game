@@ -841,6 +841,11 @@ error => {
       if (meta.phase === "night") {
   enterOnlineNight();
 }
+
+if (meta.phase === "day") {
+  enterOnlineDay();
+}
+
       
     },
     
@@ -1183,6 +1188,7 @@ window.addEventListener("pagehide", () => {
   if (stopConnectionListener) {
     stopConnectionListener();
   }
+  if (stopNightDoneListener) stopNightDoneListener();
 });
 
 
@@ -1335,6 +1341,148 @@ let stopMyNightActionListener = null;
 let myNightRole = null;
 let nightActionSaved = false;
 
+const nightDoneButton = document.getElementById("online-night-done");
+const nightDoneCount = document.getElementById("online-night-done-count");
+const goDayButton = document.getElementById("online-go-day");
+const dayScreen = document.getElementById("online-day-screen");
+const dayMembersBox = document.getElementById("online-day-members");
+let nightDoneByMe = false;
+let stopNightDoneListener = null;
+
+
+function updateNightDoneButton() {
+  const needsAction = Object.prototype.hasOwnProperty.call(
+    NIGHT_ACTION_ROLES,
+    myNightRole
+  );
+
+  if (!myNightRole || currentPhase !== "night") {
+    nightDoneButton.hidden = true;
+    return;
+  }
+
+  if (nightDoneByMe) {
+    nightDoneButton.hidden = true;
+    return;
+  }
+
+  nightDoneButton.hidden = false;
+  nightDoneButton.disabled = needsAction && !nightActionSaved;
+  nightDoneButton.textContent =
+    needsAction && !nightActionSaved
+      ? "先に夜の行動を確定してください"
+      : "夜の行動を完了する";
+}
+
+
+async function markMyNightDone() {
+  if (!currentRoom || !currentUid || currentPhase !== "night") return;
+  const needsAction = myNightRole in NIGHT_ACTION_ROLES;
+  if (!myNightRole || (needsAction && !nightActionSaved)) return;
+
+  nightDoneButton.disabled = true;
+  try {
+    await set(
+      ref(db, `rooms/${currentRoom}/nightDone/${currentUid}`),
+      true
+    );
+    nightDoneByMe = true;
+    nightDoneButton.hidden = true;
+    nightResult.textContent = "夜の行動を完了しました。";
+  } catch (error) {
+    console.error("夜の完了通知エラー:", error);
+    nightResult.textContent = "完了通知に失敗：" + error.message;
+    nightDoneButton.disabled = false;
+  }
+}
+
+nightDoneButton.addEventListener("click", markMyNightDone);
+
+function watchNightDone() {
+  if (stopNightDoneListener) stopNightDoneListener();
+  stopNightDoneListener = onValue(
+    ref(db, `rooms/${currentRoom}/nightDone`),
+    snapshot => {
+      const done = snapshot.val() || {};
+      nightDoneByMe = done[currentUid] === true;
+      const total = currentMembers.length;
+      const count = currentMembers.filter(
+        ([uid]) => done[uid] === true
+      ).length;
+
+      nightDoneCount.textContent =
+        `夜の行動完了：${count} / ${total}人`;
+      nightDoneButton.disabled = nightDoneByMe;
+      updateNightDoneButton();
+
+      goDayButton.hidden = !onlineIsHost;
+      goDayButton.disabled =
+        !onlineIsHost || total < 3 || count !== total;
+    },
+    error => {
+      console.error("夜の完了状況取得エラー:", error);
+      nightDoneCount.textContent =
+        "完了状況を取得できません：" + error.message;
+    }
+  );
+}
+
+goDayButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "night") return;
+  goDayButton.disabled = true;
+  try {
+    const [membersSnap, doneSnap] = await Promise.all([
+      get(ref(db, `rooms/${currentRoom}/members`)),
+      get(ref(db, `rooms/${currentRoom}/nightDone`))
+    ]);
+    const memberUids = Object.keys(membersSnap.val() || {});
+    const done = doneSnap.val() || {};
+
+    if (
+      memberUids.length < 3 ||
+      !memberUids.every(uid => done[uid] === true)
+    ) {
+      throw new Error("全員の行動が完了していません。");
+    }
+
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/phase`),
+      "day"
+    );
+  } catch (error) {
+    console.error("朝への移行エラー:", error);
+    nightResult.textContent =
+      "朝へ進めません：" + error.message;
+    goDayButton.disabled = false;
+  }
+});
+
+function enterOnlineDay() {
+  entryScreen.hidden = true;
+  lobbyScreen.hidden = true;
+  roleRevealBox.hidden = true;
+  nightScreen.hidden = true;
+  dayScreen.hidden = false;
+
+  dayMembersBox.replaceChildren();
+  currentMembers.forEach(([uid, member]) => {
+    const row = document.createElement("div");
+    row.className = "online-member";
+
+    const name = document.createElement("strong");
+    name.textContent = member.name;
+
+    const mark = document.createElement("span");
+    mark.textContent =
+      uid === currentHostUid ? "ホスト" :
+      uid === currentUid ? "あなた" : "参加中";
+
+    row.append(name, mark);
+    dayMembersBox.appendChild(row);
+  });
+}
+
+
 const NIGHT_ACTION_ROLES = {
   "人狼": {
     description: "襲撃する相手を選んでください。"
@@ -1410,6 +1558,7 @@ goNightButton.addEventListener("click", async () => {
 // プレイヤーの役職に応じた画面を表示
 function renderNightRole(role) {
   myNightRole = role;
+  updateNightDoneButton();
   nightRole.textContent = `あなたの役職：${role}`;
 
   const action = NIGHT_ACTION_ROLES[role];
@@ -1426,6 +1575,7 @@ function renderNightRole(role) {
   nightMessage.textContent = action.description;
   nightActionArea.hidden = nightActionSaved;
   nightSubmitButton.disabled = false;
+  updateNightDoneButton();
 }
 
 // 選択可能な参加者を表示する
@@ -1491,6 +1641,7 @@ function watchMyNightAction() {
     ),
     snapshot => {
       nightActionSaved = snapshot.exists();
+      updateNightDoneButton();
 
       if (nightActionSaved) {
         nightActionArea.hidden = true;
@@ -1514,6 +1665,10 @@ function enterOnlineNight() {
   lobbyScreen.hidden = true;
   roleRevealBox.hidden = true;
   nightScreen.hidden = false;
+  dayScreen.hidden = true;
+nightDoneButton.hidden = true;
+goDayButton.hidden = !onlineIsHost;
+watchNightDone();
 
   nightResult.textContent = "役職を確認しています…";
   nightActionArea.hidden = true;
@@ -1574,6 +1729,7 @@ nightSubmitButton.addEventListener("click", async () => {
     );
 
     nightActionSaved = true;
+    updateNightDoneButton();
     nightActionArea.hidden = true;
 
     nightResult.textContent =

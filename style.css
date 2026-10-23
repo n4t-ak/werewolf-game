@@ -1105,3 +1105,32 @@ input[type="number"] { width: 100px; }
   color: #acb6cc;
   font-size: 12px;
 }
+
+#online-night-done-count {
+  margin: 18px 0;
+  color: #ffe7b4;
+  font-size: 17px;
+  font-weight: 700;
+}
+#online-go-day {
+  margin: 18px auto;
+}
+#online-day-screen {
+  padding: 18px 0;
+  text-align: center;
+}
+#online-day-screen h2 {
+  color: #ffe7b4;
+  font-size: 28px;
+}
+#online-day-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+#online-day-notice {
+  margin-top: 24px;
+  color: #acb6cc;
+  line-height: 1.8;
+}

@@ -233,10 +233,33 @@
           </div>
 
           <p id="online-night-result" role="status"></p>
+          
+<button id="online-night-done" type="button" hidden>
+  夜の行動を完了する
+</button>
+<p id="online-night-done-count"></p>
+<button id="online-go-day" type="button" hidden disabled>
+  全員の行動完了・朝へ進む
+</button>
+
           <p class="online-wait-message">
             全員の行動が終わるまで待機してください。
           </p>
         </div>
+
+<!-- 全員共通：朝の画面 -->
+<div id="online-day-screen" hidden>
+  <h2>朝になりました</h2>
+  <p class="online-wait-message">
+    初夜の行動が終了しました。
+  </p>
+  <h3>参加者一覧</h3>
+  <div id="online-day-members"></div>
+  <p id="online-day-notice">
+    現在は初夜の結果判定を実装していないため、
+    襲撃結果や占い結果はまだ表示されません。
+  </p>
+</div>
 
         <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>
@@ -254,8 +277,9 @@
 
 
   <!-- Firebase・オンラインゲーム処理 -->
-  
-<script type="module" src="./online.js?v=20261023-2"></script>
+
+<script type="module" src="./online.js?v=20261023-5"></script>
+
 
 
   <!-- 戻るボタンの表示制御 -->

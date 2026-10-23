@@ -96,8 +96,9 @@ function showLobby(roomCode) {
 
   showStatus("ルームに接続しました。");
 
-  watchMembers(roomCode);
+watchMembers(roomCode);
 watchOnlinePhase();
+watchOnlineSettings();
 }
 
 // 参加者一覧をリアルタイム同期する
@@ -129,6 +130,9 @@ function watchMembers(roomCode) {
         `参加者（${members.length}人）`;
         memberCount.dataset.playerCount =
   String(members.length);
+  if (!onlineIsHost && sharedOnlineSettings) {
+  renderOnlineGuestSettings(sharedOnlineSettings);
+}
 
 if (onlineIsHost) {
   validateOnlineRoles();
@@ -208,11 +212,19 @@ console.log("② 匿名認証成功");
 
 console.log("④ ルーム作成成功");
 
+
 await registerMember(roomCode, name, user.uid);
 
 console.log("⑤ 参加者登録成功");
 
+// ルーム作成時の詳細設定を保存
+await set(
+  ref(db, `rooms/${roomCode}/settings`),
+  collectOnlineSettings()
+);
+
 showLobby(roomCode);
+
 
   } catch (error) {
     showStatus("エラー：" + error.message);
@@ -221,71 +233,61 @@ showLobby(roomCode);
   }
 }
 
-// 既存のルームへ入室する
+
 async function joinRoom() {
   if (busy) return;
+
+  const name = nameInput.value.trim();
+
+  // 名前が未入力の場合
+  if (!name) {
+    showStatus("名前を入力してください。");
+    nameInput.focus();
+    return;
+  }
+
+  if (name.length > 20) {
+    showStatus("名前は20文字以内で入力してください。");
+    nameInput.focus();
+    return;
+  }
+
+  const roomCode = roomInput.value.trim();
+
+  if (!/^\d{6}$/.test(roomCode)) {
+    showStatus("6桁のルーム番号を入力してください。");
+    roomInput.focus();
+    return;
+  }
 
   setBusy(true);
   showStatus("ルームに参加しています…");
 
   try {
-    const name = getPlayerName();
-    const roomCode = roomInput.value.trim();
-
-    if (!/^\d{6}$/.test(roomCode)) {
-      throw new Error("6桁のルーム番号を入力してください。");
-    }
-
     const user = await getUser();
 
-    // ルール側で存在する待機中ルームだけ許可
     await registerMember(roomCode, name, user.uid);
 
     showLobby(roomCode);
 
   } catch (error) {
-    showStatus(
-      "参加できません。番号・ルームの状態・権限を確認してください。"
-    );
-    console.error(error);
+    console.error("ルーム参加エラー：", error);
+
+    if (error.code === "PERMISSION_DENIED" ||
+        error.code === "permission-denied") {
+      showStatus(
+        "ルームが見つからないか、すでにゲームが始まっています。"
+      );
+    } else {
+      showStatus(
+        "参加できませんでした。通信状態を確認して、もう一度お試しください。"
+      );
+    }
   } finally {
     setBusy(false);
   }
 }
 
-createButton.addEventListener("click", createRoom);
-joinButton.addEventListener("click", joinRoom);
-
-// 招待リンクをコピーする
-document.getElementById("copy-room-link")
-  .addEventListener("click", async () => {
-    if (!currentRoom) return;
-
-    const url =
-      `${location.origin}${location.pathname}?room=${currentRoom}`;
-
-    try {
-      await navigator.clipboard.writeText(url);
-      showStatus("招待リンクをコピーしました。");
-    } catch {
-      showStatus("リンクをコピーできませんでした。");
-    }
-  });
-
-// 招待リンクから開いた場合はルーム番号を入力済みにする
-const invitedRoom =
-  new URLSearchParams(location.search).get("room");
-
-if (invitedRoom && /^\d{6}$/.test(invitedRoom)) {
-  roomInput.value = invitedRoom;
-}
-
-// 使わなくなった監視を終了
-window.addEventListener("pagehide", () => {
-  if (stopMembersListener) {
-    stopMembersListener();
-  }
-});
 
 
 // ========================================
@@ -437,10 +439,18 @@ async function startOnlineRoleGame() {
   onlineRoleStarted = true;
   startGameButton.disabled = true;
 
-  try {
-    const snapshot = await get(
-      ref(db, `rooms/${currentRoom}/members`)
-    );
+  
+try {
+  // 入力途中の保存タイマーを止める
+  clearTimeout(settingsSaveTimer);
+
+  // 役職配布前に最新の設定を確定する
+  await saveOnlineSettings();
+
+  const snapshot = await get(
+    ref(db, `rooms/${currentRoom}/members`)
+  );
+
 
     const members = Object.keys(snapshot.val() || {});
     const counts = getOnlineRoleCounts();
@@ -600,13 +610,21 @@ function watchOnlinePhase() {
 
       onlineIsHost = meta.hostUid === currentUid;
 
-      if (meta.phase === "lobby") {
-        roleRevealBox.hidden = true;
+      
+if (meta.phase === "lobby") {
+  roleRevealBox.hidden = true;
 
-        roleSettingsBox.hidden = !onlineIsHost;
+  updateOnlineSettingsVisibility();
 
-        if (onlineIsHost) validateOnlineRoles();
-      }
+  if (onlineIsHost) {
+    validateOnlineRoles();
+  } else {
+    renderOnlineGuestSettings(
+      sharedOnlineSettings
+    );
+  }
+}
+
 
       if (meta.phase === "firstNight") {
         // 待機画面から役職確認画面へ
@@ -645,3 +663,291 @@ function watchOnlinePhase() {
     }
   );
 }
+
+
+// ========================================
+// オンライン設定の共有・同期
+// ========================================
+
+const ONLINE_EXTRA_SETTINGS = [
+  {
+    key: "madmanKnowsWolves",
+    id: "online-madman-knows-wolves",
+    label: "狂人が人狼を把握できる"
+  },
+  {
+    key: "allowConsecutiveGuard",
+    id: "online-consecutive-guard",
+    label: "騎士の連続護衛を許可"
+  },
+  {
+    key: "roleMissing",
+    id: "online-role-missing",
+    label: "役職欠けを有効にする"
+  },
+  {
+    key: "publicVotes",
+    id: "online-public-votes",
+    label: "投票履歴を公開する"
+  },
+  {
+    key: "randomEvents",
+    id: "online-random-events",
+    label: "ランダム事件カード"
+  }
+];
+
+let stopSettingsListener = null;
+let settingsSaveTimer = null;
+let settingsSavePromise = Promise.resolve();
+let sharedOnlineSettings = null;
+
+// 現在の入力欄から設定を読み取る
+function collectOnlineSettings() {
+  const roleCounts = {};
+
+  ONLINE_ROLES.forEach((role, index) => {
+    roleCounts[String(index)] =
+      getOnlineRoleCounts()[index];
+  });
+
+  const extras = {};
+
+  ONLINE_EXTRA_SETTINGS.forEach(setting => {
+    extras[setting.key] =
+      document.getElementById(setting.id).checked;
+  });
+
+  return {
+    roleCounts,
+    extras
+  };
+}
+
+// ホストだけが設定を書き込む
+function saveOnlineSettings() {
+  if (!currentRoom || !onlineIsHost) {
+    return Promise.resolve();
+  }
+
+  if (validateOnlineRoles()) {
+    return Promise.resolve();
+  }
+
+  const data = collectOnlineSettings();
+
+  settingsSavePromise = settingsSavePromise
+    .catch(() => {})
+    .then(() =>
+      set(
+        ref(db, `rooms/${currentRoom}/settings`),
+        data
+      )
+    );
+
+  settingsSavePromise.catch(error => {
+    console.error("設定保存エラー：", error);
+    showStatus("設定を保存できませんでした。");
+  });
+
+  return settingsSavePromise;
+}
+
+// 細かい入力操作のたびに通信しない
+function scheduleOnlineSettingsSave() {
+  clearTimeout(settingsSaveTimer);
+
+  settingsSaveTimer = setTimeout(() => {
+    if (validateOnlineRoles()) return;
+    saveOnlineSettings();
+  }, 400);
+}
+
+// ホストの入力変更を監視
+document.querySelectorAll(".online-role-count")
+  .forEach(input => {
+    input.addEventListener(
+      "input",
+      scheduleOnlineSettingsSave
+    );
+  });
+
+ONLINE_EXTRA_SETTINGS.forEach(setting => {
+  document.getElementById(setting.id)
+    .addEventListener("change", () => {
+      validateOnlineRoles();
+      scheduleOnlineSettingsSave();
+    });
+});
+
+// 参加者用の閲覧専用画面を更新
+function renderOnlineGuestSettings(settings) {
+  const guestRoles =
+    document.getElementById("online-guest-role-list");
+
+  const guestExtras =
+    document.getElementById("online-guest-extras");
+
+  const villagerText =
+    document.getElementById("online-guest-villagers");
+
+  guestRoles.replaceChildren();
+  guestExtras.replaceChildren();
+
+  if (!settings ||
+      !settings.roleCounts ||
+      !settings.extras) {
+    villagerText.textContent =
+      "ホストの設定を待っています。";
+    return;
+  }
+
+  const counts = ONLINE_ROLES.map((_, index) =>
+    Number(settings.roleCounts[String(index)] ?? 0)
+  );
+
+  ONLINE_ROLES.forEach((role, index) => {
+    const row = document.createElement("div");
+    row.className = "online-readonly-row";
+
+    const name = document.createElement("strong");
+    name.textContent = role.name;
+
+    const count = document.createElement("span");
+    count.textContent = `${counts[index]}人`;
+
+    row.append(name, count);
+    guestRoles.appendChild(row);
+  });
+
+  const playerCount =
+    Number(memberCount.dataset.playerCount || 0);
+
+  const selectedTotal = counts.reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  villagerText.textContent =
+    `村人：${Math.max(0, playerCount - selectedTotal)}人`;
+
+  ONLINE_EXTRA_SETTINGS.forEach(setting => {
+    const row = document.createElement("div");
+    row.className = "online-readonly-row";
+
+    const name = document.createElement("strong");
+    name.textContent = setting.label;
+
+    const value = document.createElement("span");
+    const enabled = settings.extras[setting.key] === true;
+
+    value.textContent = enabled ? "ON" : "OFF";
+    value.className = enabled
+      ? "online-setting-on"
+      : "online-setting-off";
+
+    row.append(name, value);
+    guestExtras.appendChild(row);
+  });
+}
+
+// 自分がホストか参加者かによって表示を切り替える
+function updateOnlineSettingsVisibility() {
+  const guestBox =
+    document.getElementById("online-guest-settings");
+
+  // 役職配布前だけ表示する
+  const inLobby =
+    !document.getElementById("lobby-screen").hidden;
+
+  guestBox.hidden = !inLobby || onlineIsHost;
+
+  roleSettingsBox.hidden = !inLobby || !onlineIsHost;
+}
+
+// 設定データだけを監視して通信量を抑える
+function watchOnlineSettings() {
+  if (stopSettingsListener) {
+    stopSettingsListener();
+  }
+
+  const settingsRef = ref(
+    db,
+    `rooms/${currentRoom}/settings`
+  );
+
+  stopSettingsListener = onValue(
+    settingsRef,
+    snapshot => {
+      sharedOnlineSettings = snapshot.val();
+
+      if (!onlineIsHost) {
+        renderOnlineGuestSettings(
+          sharedOnlineSettings
+        );
+      }
+    },
+    error => {
+      console.error("設定同期エラー：", error);
+      showStatus("ゲーム設定を読み込めませんでした。");
+    }
+  );
+}
+
+
+/* ========================================
+   ルーム作成・参加ボタンの設定
+======================================== */
+
+// 新しいルームを作成
+createButton.addEventListener("click", createRoom);
+
+// 既存のルームに参加
+joinButton.addEventListener("click", joinRoom);
+
+// 招待リンクをコピー
+document.getElementById("copy-room-link")
+  .addEventListener("click", async () => {
+    if (!currentRoom) return;
+
+    const url =
+      `${location.origin}${location.pathname}?room=${currentRoom}`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      showStatus("招待リンクをコピーしました。");
+    } catch {
+      showStatus("リンクをコピーできませんでした。");
+    }
+  });
+
+// 招待リンクから開いた場合、ルーム番号を自動入力
+const invitedRoom =
+  new URLSearchParams(location.search).get("room");
+
+if (invitedRoom && /^\d{6}$/.test(invitedRoom)) {
+  roomInput.value = invitedRoom;
+}
+
+// ページを離れたときに監視を解除
+window.addEventListener("pagehide", () => {
+  if (stopMembersListener) {
+    stopMembersListener();
+  }
+
+  if (stopPhaseListener) {
+    stopPhaseListener();
+  }
+
+  if (stopRoleListener) {
+    stopRoleListener();
+  }
+
+  if (stopReadyListener) {
+    stopReadyListener();
+  }
+
+  if (stopSettingsListener) {
+    stopSettingsListener();
+  }
+});

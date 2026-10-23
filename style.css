@@ -2027,3 +2027,128 @@ textarea:focus-visible {
 #online-game [hidden] {
   display: none !important;
 }
+
+
+/* ========================================
+   オンライン人狼：設定の共有表示
+======================================== */
+
+#online-guest-settings {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid #46516a;
+}
+
+#online-guest-role-list,
+#online-guest-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 16px 0 22px;
+}
+
+.online-readonly-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+
+  padding: 14px;
+  background: #182133;
+  border: 1px solid #46516a;
+  border-radius: 11px;
+
+  text-align: left;
+}
+
+.online-readonly-row strong {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.online-readonly-row span {
+  color: #ffd166;
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#online-guest-villagers {
+  color: #ffd166;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.online-settings-help {
+  color: #acb6cc;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* 詳細設定 */
+.online-extra-settings {
+  display: flex;
+  flex-direction: column;
+  margin: 18px 0;
+  padding: 0 14px;
+
+  background: #182133;
+  border: 1px solid #46516a;
+  border-radius: 14px;
+}
+
+.online-extra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+
+  padding: 17px 0;
+  border-bottom: 1px solid #46516a;
+
+  text-align: left;
+}
+
+.online-extra-row:last-child {
+  border-bottom: none;
+}
+
+.online-extra-row > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.online-extra-row strong {
+  display: block;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.online-extra-row small {
+  display: block;
+  margin-top: 6px;
+  color: #aab2c3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#online-game .online-extra-row input {
+  width: 21px;
+  height: 21px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #e34f62;
+}
+
+.online-readonly-row .online-setting-on {
+  color: #90e3b3;
+}
+
+.online-readonly-row .online-setting-off {
+  color: #aab2c3;
+}
+
+#online-game [hidden] {
+  display: none !important;
+}

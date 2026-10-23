@@ -67,6 +67,26 @@
             全員が参加するまで待ってください。
           </p>
           
+<!-- 参加者専用：閲覧だけできる役職設定 -->
+<div id="online-guest-settings" hidden>
+  <h3>今回の役職構成</h3>
+
+  <p class="online-settings-help">
+    ホストが設定した役職と人数です。
+  </p>
+
+  <div id="online-guest-role-list"></div>
+
+  <p id="online-guest-villagers"></p>
+
+  <h3>詳細設定</h3>
+  <div id="online-guest-extras"></div>
+
+  <p class="online-settings-help">
+    設定を変更できるのはホストだけです。
+  </p>
+</div>
+
 <!-- ホスト専用の役職設定 -->
 <div id="online-role-settings" hidden>
   <h3>役職設定</h3>
@@ -76,10 +96,53 @@
 
   <p id="online-villager-count"></p>
 
-  <label class="online-check-label">
-    <input type="checkbox" id="online-role-missing">
-    役職欠けを有効にする
+
+<h3>詳細設定</h3>
+
+<div class="online-extra-settings">
+
+  <label class="online-extra-row">
+    <span>
+      <strong>狂人が人狼を把握できる</strong>
+      <small>狂人に人狼の名前を公開します。</small>
+    </span>
+    <input type="checkbox" id="online-madman-knows-wolves">
   </label>
+
+  <label class="online-extra-row">
+    <span>
+      <strong>騎士の連続護衛を許可</strong>
+      <small>前の夜と同じ相手も護衛できます。</small>
+    </span>
+    <input type="checkbox" id="online-consecutive-guard">
+  </label>
+
+  <label class="online-extra-row">
+    <span>
+      <strong>役職欠けを有効にする</strong>
+      <small>人狼以外の特殊役職が1つ欠けます。</small>
+    </span>
+    <input type="checkbox" id="online-role-missing">
+  </label>
+
+  <label class="online-extra-row">
+    <span>
+      <strong>投票履歴を公開する</strong>
+      <small>誰が誰に投票したかを公開します。</small>
+    </span>
+    <input type="checkbox" id="online-public-votes">
+  </label>
+
+  <label class="online-extra-row">
+    <span>
+      <strong>ランダム事件カード</strong>
+      <small>毎朝、議論時間が変化することがあります。</small>
+    </span>
+    <input type="checkbox" id="online-random-events">
+  </label>
+
+</div>
+
 
   <p id="online-role-error" role="alert"></p>
 

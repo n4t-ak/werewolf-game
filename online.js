@@ -26,8 +26,12 @@ const memberCount = document.getElementById("member-count");
 const createButton = document.getElementById("create-room");
 const joinButton = document.getElementById("join-room");
 
+
 let currentRoom = null;
 let currentUid = null;
+let currentHostUid = null;
+let currentMembers = [];
+
 let stopMembersListener = null;
 let busy = false;
 let stopConnectionListener = null;
@@ -130,89 +134,76 @@ watchOnlineConnection();
 }
 
 // 参加者一覧をリアルタイム同期する
+
+function renderMemberLists() {
+  const roleMemberList = document.getElementById("online-role-member-list");
+
+  membersBox.replaceChildren();
+  if (roleMemberList) roleMemberList.replaceChildren();
+
+  currentMembers.forEach(([uid, member]) => {
+    function createMemberRow() {
+      const item = document.createElement("div");
+      item.className = "online-member";
+
+      const name = document.createElement("strong");
+      name.textContent = member.name;
+
+      const mark = document.createElement("span");
+      mark.textContent =
+        uid === currentHostUid
+          ? "ホスト"
+          : uid === currentUid
+            ? "あなた"
+            : "参加中";
+
+      item.append(name, mark);
+      return item;
+    }
+
+    membersBox.appendChild(createMemberRow());
+    if (roleMemberList) {
+      roleMemberList.appendChild(createMemberRow());
+    }
+  });
+}
+
 function watchMembers(roomCode) {
   if (stopMembersListener) {
     stopMembersListener();
     stopMembersListener = null;
   }
 
-  const membersRef = ref(
-    db,
-    `rooms/${roomCode}/members`
-  );
+  const membersRef = ref(db, `rooms/${roomCode}/members`);
 
   stopMembersListener = onValue(
     membersRef,
     snapshot => {
       const data = snapshot.val() || {};
 
-      const members = Object.entries(data)
-        .sort((a, b) =>
-          (a[1].joinedAt || 0) -
-          (b[1].joinedAt || 0)
-        );
+      currentMembers = Object.entries(data).sort(
+        (a, b) =>
+          (a[1].joinedAt || 0) - (b[1].joinedAt || 0)
+      );
 
-      membersBox.replaceChildren();
+      memberCount.textContent = `参加者（${currentMembers.length}人）`;
+      memberCount.dataset.playerCount = String(currentMembers.length);
 
-const roleMemberList = document.getElementById("online-role-member-list");
-if (roleMemberList) {
-  roleMemberList.replaceChildren();
-  members.forEach(([uid, member]) => {
-    const item = document.createElement("div");
-    item.className = "online-member";
-    const name = document.createElement("strong");
-    name.textContent = member.name;
-    const mark = document.createElement("span");
-    mark.textContent = uid === currentUid ? "あなた" : "参加中";
-    item.append(name, mark);
-    roleMemberList.appendChild(item);
-  });
-}
+      renderMemberLists();
 
-      memberCount.textContent =
-        `参加者（${members.length}人）`;
-        memberCount.dataset.playerCount =
-  String(members.length);
-  if (!onlineIsHost && sharedOnlineSettings) {
-  renderOnlineGuestSettings(sharedOnlineSettings);
-}
+      if (!onlineIsHost && sharedOnlineSettings) {
+        renderOnlineGuestSettings(sharedOnlineSettings);
+      }
 
-if (onlineIsHost) {
-  validateOnlineRoles();
-}
-
-      members.forEach(([uid, member]) => {
-        const item = document.createElement("div");
-        item.className = "online-member";
-
-        const name = document.createElement("strong");
-        name.textContent = member.name;
-
-        const mark = document.createElement("span");
-        
-mark.textContent =
-  uid === currentHostUid
-    ? "ホスト"
-    : uid === currentUid
-      ? "あなた"
-      : "参加中";
-
-
-        item.append(name, mark);
-        membersBox.appendChild(item);
-      });
+      if (onlineIsHost) {
+        validateOnlineRoles();
+      }
     },
     error => {
-      showStatus(
-        "参加者一覧を取得できません：" + error.message
-      );
+      console.error("参加者一覧の取得エラー:", error);
+      showStatus("参加者一覧を取得できません：" + error.message);
     }
   );
-  
-const roleMemberList = document.getElementById("online-role-member-list");
-
-
-
 }
 
 // 新しいルームを作成する
@@ -763,7 +754,11 @@ function watchOnlinePhase() {
 
       if (!meta) return;
 
-      onlineIsHost = meta.hostUid === currentUid;
+      
+currentHostUid = meta.hostUid;
+onlineIsHost = currentHostUid === currentUid;
+renderMemberLists();
+
     currentPhase = meta.phase;
       
 if (meta.phase === "lobby") {

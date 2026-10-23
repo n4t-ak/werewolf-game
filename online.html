@@ -66,6 +66,73 @@
           <p id="lobby-notice">
             全員が参加するまで待ってください。
           </p>
+          
+<!-- ホスト専用の役職設定 -->
+<div id="online-role-settings" hidden>
+  <h3>役職設定</h3>
+  <p>各役職の人数を設定してください。</p>
+
+  <div id="online-role-list"></div>
+
+  <p id="online-villager-count"></p>
+
+  <label class="online-check-label">
+    <input type="checkbox" id="online-role-missing">
+    役職欠けを有効にする
+  </label>
+
+  <p id="online-role-error" role="alert"></p>
+
+  <button id="online-start-game">
+    役職を配布してゲームを開始
+  </button>
+
+</div>
+<!-- ここで lobby-screen を閉じる -->
+
+<!-- 全員共通の役職確認画面 -->
+<div id="online-role-reveal" hidden>
+  <h3>あなたの役職</h3>
+
+  <div class="online-role-card">
+    <strong id="online-my-role">確認中...</strong>
+    <p id="online-my-role-description"></p>
+  </div>
+
+  <button id="online-ready-button">
+    役職を確認しました
+  </button>
+
+  <h3 id="online-ready-count">確認状況</h3>
+  <div id="online-ready-members"></div>
+
+  <p class="online-wait-message">
+    全員の役職確認が終了するまで待機してください。
+  </p>
+</div>
+
+
+<!-- 全員共通の役職確認画面 -->
+<div id="online-role-reveal" hidden>
+  <h3>あなたの役職</h3>
+
+  <div class="online-role-card">
+    <strong id="online-my-role">確認中...</strong>
+    <p id="online-my-role-description"></p>
+  </div>
+
+  <button id="online-ready-button">
+    役職を確認しました
+  </button>
+
+  <h3 id="online-ready-count">確認状況</h3>
+  <div id="online-ready-members"></div>
+
+  <p class="online-wait-message">
+    全員の役職確認が終了するまで待機してください。
+  </p>
+</div>
+
         </div>
 
         <p id="online-status" role="status"></p>

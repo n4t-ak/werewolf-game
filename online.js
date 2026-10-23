@@ -6,6 +6,7 @@ import {
   get
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
 
+
 import {
   db,
   loginAnonymously
@@ -96,6 +97,7 @@ function showLobby(roomCode) {
   showStatus("ルームに接続しました。");
 
   watchMembers(roomCode);
+watchOnlinePhase();
 }
 
 // 参加者一覧をリアルタイム同期する
@@ -125,6 +127,12 @@ function watchMembers(roomCode) {
 
       memberCount.textContent =
         `参加者（${members.length}人）`;
+        memberCount.dataset.playerCount =
+  String(members.length);
+
+if (onlineIsHost) {
+  validateOnlineRoles();
+}
 
       members.forEach(([uid, member]) => {
         const item = document.createElement("div");
@@ -278,3 +286,362 @@ window.addEventListener("pagehide", () => {
     stopMembersListener();
   }
 });
+
+
+// ========================================
+// オンライン役職設定・配布
+// ========================================
+
+const ONLINE_ROLES = [
+  { name: "人狼", description: "毎晩1人を襲撃します。" },
+  { name: "狂人", description: "人狼陣営の味方です。" },
+  { name: "占い師", description: "毎晩1人を占います。" },
+  { name: "騎士", description: "毎晩1人を護衛します。" },
+  { name: "霊媒師", description: "処刑された人の正体を調べます。" },
+  { name: "てるてる", description: "昼に処刑されると単独勝利します。" },
+  { name: "怪盗", description: "最初の夜に役職を交換できます。" }
+];
+
+const roleSettingsBox =
+  document.getElementById("online-role-settings");
+const roleListBox =
+  document.getElementById("online-role-list");
+const roleRevealBox =
+  document.getElementById("online-role-reveal");
+const roleErrorBox =
+  document.getElementById("online-role-error");
+const startGameButton =
+  document.getElementById("online-start-game");
+const roleMissingInput =
+  document.getElementById("online-role-missing");
+
+let onlineIsHost = false;
+let onlineRoleStarted = false;
+let stopPhaseListener = null;
+let stopRoleListener = null;
+let stopReadyListener = null;
+
+// 役職設定欄を生成
+ONLINE_ROLES.forEach((role, index) => {
+  const row = document.createElement("div");
+  row.className = "online-role-row";
+
+  const label = document.createElement("label");
+  label.textContent = role.name;
+  label.htmlFor = `online-role-${index}`;
+
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.max = "20";
+  input.step = "1";
+  input.value = index === 0 ? "1" : "0";
+  input.id = `online-role-${index}`;
+  input.className = "online-role-count";
+
+  input.addEventListener("input", validateOnlineRoles);
+
+  row.append(label, input);
+  roleListBox.appendChild(row);
+});
+
+roleMissingInput.addEventListener(
+  "change",
+  validateOnlineRoles
+);
+
+function getOnlineRoleCounts() {
+  return ONLINE_ROLES.map((_, index) => {
+    const value = document.getElementById(
+      `online-role-${index}`
+    ).value;
+
+    return value.trim() === "" ? NaN : Number(value);
+  });
+}
+
+function validateOnlineRoles() {
+  const counts = getOnlineRoleCounts();
+
+  const total = counts.reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  const numberOfPlayers = Number(
+    memberCount.dataset.playerCount || 0
+  );
+
+  const villagers = numberOfPlayers - total;
+
+  document.getElementById(
+    "online-villager-count"
+  ).textContent = `村人：${villagers}人`;
+
+  let error = "";
+
+  if (numberOfPlayers < 3 || numberOfPlayers > 20) {
+    error = "プレイヤーは3〜20人必要です。";
+  } else if (
+    counts.some(count =>
+      !Number.isInteger(count) || count < 0
+    )
+  ) {
+    error = "役職人数は0以上の整数にしてください。";
+  } else if (counts[0] < 1) {
+    error = "人狼は最低1人必要です。";
+  } else if (villagers < 1) {
+    error = "村人を最低1人残してください。";
+  } else if (
+    counts[0] >= numberOfPlayers - counts[0]
+  ) {
+    error = "人狼の人数が多すぎます。";
+  } else if (counts[5] > 1 || counts[6] > 1) {
+    error = "てるてると怪盗は各1人までです。";
+  } else if (
+    roleMissingInput.checked &&
+    counts.slice(1).every(count => count === 0)
+  ) {
+    error = "役職欠けには人狼以外の特殊役職が必要です。";
+  }
+
+  roleErrorBox.textContent = error;
+  startGameButton.disabled =
+    Boolean(error) || onlineRoleStarted;
+
+  return error;
+}
+
+function shuffleOnlineRoles(items) {
+  const result = [...items];
+
+  for (let i = result.length - 1; i > 0; i--) {
+    const random = new Uint32Array(1);
+    crypto.getRandomValues(random);
+
+    const j = random[0] % (i + 1);
+
+    [result[i], result[j]] =
+      [result[j], result[i]];
+  }
+
+  return result;
+}
+
+async function startOnlineRoleGame() {
+  if (!currentRoom || !onlineIsHost ||
+      onlineRoleStarted) return;
+
+  if (validateOnlineRoles()) return;
+
+  onlineRoleStarted = true;
+  startGameButton.disabled = true;
+
+  try {
+    const snapshot = await get(
+      ref(db, `rooms/${currentRoom}/members`)
+    );
+
+    const members = Object.keys(snapshot.val() || {});
+    const counts = getOnlineRoleCounts();
+
+    const roles = [];
+
+    ONLINE_ROLES.forEach((role, index) => {
+      for (let i = 0; i < counts[index]; i++) {
+        roles.push(role.name);
+      }
+    });
+
+    while (roles.length < members.length) {
+      roles.push("村人");
+    }
+
+    if (roles.length !== members.length) {
+      throw new Error("参加人数が変更されました。");
+    }
+
+    // 役職欠け：特殊役職を1枚村人に置き換える
+    if (roleMissingInput.checked) {
+      const candidates = roles
+        .map((role, index) => ({ role, index }))
+        .filter(item =>
+          item.role !== "人狼" &&
+          item.role !== "村人"
+        );
+
+      if (candidates.length === 0) {
+        throw new Error("欠ける役職がありません。");
+      }
+
+      const random = new Uint32Array(1);
+      crypto.getRandomValues(random);
+
+      const choice =
+        candidates[random[0] % candidates.length];
+
+      roles[choice.index] = "村人";
+    }
+
+    const shuffled = shuffleOnlineRoles(roles);
+    const assignments = {};
+
+    members.forEach((uid, index) => {
+      assignments[uid] = shuffled[index];
+    });
+
+    showStatus("役職を配布しています…");
+
+    // 役職の保存を完了してからゲームを開始
+    await set(
+      ref(db, `rooms/${currentRoom}/roles`),
+      assignments
+    );
+
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/phase`),
+      "firstNight"
+    );
+
+    showStatus("役職を配布しました。");
+
+  } catch (error) {
+    console.error(error);
+    showStatus("配布エラー：" + error.message);
+  } finally {
+    onlineRoleStarted = false;
+    validateOnlineRoles();
+  }
+}
+
+startGameButton.addEventListener(
+  "click",
+  startOnlineRoleGame
+);
+
+// 自分の役職だけを表示
+function showMyOnlineRole(role) {
+  const roleName =
+    document.getElementById("online-my-role");
+  const description =
+    document.getElementById("online-my-role-description");
+
+  roleName.textContent = role;
+
+  const found = ONLINE_ROLES.find(
+    item => item.name === role
+  );
+
+  description.textContent = found
+    ? found.description
+    : "特殊能力のない村人です。";
+}
+
+// 役職確認完了
+document.getElementById("online-ready-button")
+  .addEventListener("click", async () => {
+    if (!currentRoom || !currentUid) return;
+
+    const button =
+      document.getElementById("online-ready-button");
+
+    button.disabled = true;
+
+    try {
+      await set(
+        ref(db,
+          `rooms/${currentRoom}/ready/${currentUid}`
+        ),
+        true
+      );
+
+      button.textContent = "確認完了";
+    } catch (error) {
+      button.disabled = false;
+      showStatus("確認エラー：" + error.message);
+    }
+  });
+
+function watchOnlineReady() {
+  if (stopReadyListener) stopReadyListener();
+
+  stopReadyListener = onValue(
+    ref(db, `rooms/${currentRoom}/ready`),
+    snapshot => {
+      const ready = snapshot.val() || {};
+      const count = Object.values(ready)
+        .filter(Boolean).length;
+
+      document.getElementById(
+        "online-ready-count"
+      ).textContent = `役職確認済み：${count}人`;
+
+      const button =
+        document.getElementById("online-ready-button");
+
+      if (ready[currentUid] === true) {
+        button.disabled = true;
+        button.textContent = "確認完了";
+      }
+    }
+  );
+}
+
+// 現在のフェーズを監視
+function watchOnlinePhase() {
+  if (stopPhaseListener) stopPhaseListener();
+
+  stopPhaseListener = onValue(
+    ref(db, `rooms/${currentRoom}/meta`),
+    snapshot => {
+      const meta = snapshot.val();
+
+      if (!meta) return;
+
+      onlineIsHost = meta.hostUid === currentUid;
+
+      if (meta.phase === "lobby") {
+        roleRevealBox.hidden = true;
+
+        roleSettingsBox.hidden = !onlineIsHost;
+
+        if (onlineIsHost) validateOnlineRoles();
+      }
+
+      if (meta.phase === "firstNight") {
+        // 待機画面から役職確認画面へ
+        document.getElementById(
+          "entry-screen"
+        ).hidden = true;
+
+        document.getElementById(
+          "lobby-screen"
+        ).hidden = true;
+
+        roleSettingsBox.hidden = true;
+        roleRevealBox.hidden = false;
+
+        if (stopRoleListener) stopRoleListener();
+
+        stopRoleListener = onValue(
+          ref(db,
+            `rooms/${currentRoom}/roles/${currentUid}`
+          ),
+          snapshot => {
+            if (snapshot.exists()) {
+              showMyOnlineRole(snapshot.val());
+            }
+          },
+          error => {
+            showStatus("役職取得エラー：" + error.message);
+          }
+        );
+
+        watchOnlineReady();
+      }
+    },
+    error => {
+      showStatus("進行同期エラー：" + error.message);
+    }
+  );
+}

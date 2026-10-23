@@ -1076,3 +1076,32 @@ input[type="number"] { width: 100px; }
     font-size: 12px;
   }
 }
+
+
+/* 役職確認画面の参加者一覧 */
+#online-role-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 24px;
+}
+#online-role-member-list .online-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #252d40;
+  border: 1px solid #46516a;
+  border-radius: 12px;
+  text-align: left;
+}
+#online-role-member-list .online-member strong {
+  color: #ffffff;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+#online-role-member-list .online-member span {
+  color: #acb6cc;
+  font-size: 12px;
+}

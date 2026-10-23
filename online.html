@@ -201,11 +201,17 @@
             全員の確認完了・初夜へ進む
           </button>
 
-          <h3 id="online-ready-count">確認状況</h3>
-          <div id="online-ready-members"></div>
-          <p class="online-wait-message">
-            全員の役職確認が終了するまで待機してください。
-          </p>
+         
+<h3 id="online-ready-count">確認状況</h3>
+<div id="online-ready-members"></div>
+
+<h3>参加者一覧</h3>
+<div id="online-role-member-list"></div>
+
+<p class="online-wait-message">
+  全員の役職確認が終了するまで待機してください。
+</p>
+
         </div>
 
         <!-- 全員共通：初夜の行動画面 -->
@@ -234,37 +240,7 @@
 
         <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>
-    
-<p id="online-debug" style="font-size:12px;color:#ffd166;overflow-wrap:anywhere;"></p>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const debug = document.getElementById("online-debug");
-  const entry = document.getElementById("entry-screen");
-  const lobby = document.getElementById("lobby-screen");
-  const role = document.getElementById("online-role-reveal");
-  if (!debug || !entry || !lobby || !role) return;
-
-  function check() {
-    const roleName = document.getElementById("online-my-role");
-    debug.textContent =
-      "診断: ルーム選択=" + !entry.hidden +
-      " / ロビー=" + !lobby.hidden +
-      " / 役職画面=" + !role.hidden +
-      " / 役職=" + (roleName?.textContent || "なし");
-  }
-
-  const observer = new MutationObserver(check);
-  observer.observe(entry, { attributes: true, attributeFilter: ["hidden"] });
-  observer.observe(lobby, { attributes: true, attributeFilter: ["hidden"] });
-  observer.observe(role, { attributes: true, attributeFilter: ["hidden"] });
-  observer.observe(document.getElementById("online-my-role"), {
-    childList: true,
-    characterData: true,
-    subtree: true
-  });
-  check();
-});
-</script>
+ 
   
     </div>
     </section>

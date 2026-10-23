@@ -46,17 +46,24 @@ function setBusy(value) {
   joinButton.disabled = value;
 }
 
-function getPlayerName() {
-  const name = onlineIsHost
-  ? nameInput.value.trim()
-  : joinNameInput.value.trim();
 
-  if (!name || name.length > 20) {
-    throw new Error("名前を1〜20文字で入力してください。");
+function getPlayerName() {
+  // ルーム作成画面の名前入力欄を使用する
+  const name = nameInput.value.trim();
+
+  if (!name) {
+    nameInput.focus();
+    throw new Error("プレイヤー名を入力してください。");
+  }
+
+  if (name.length > 20) {
+    nameInput.focus();
+    throw new Error("名前は20文字以内で入力してください。");
   }
 
   return name;
 }
+
 
 function randomRoomCode() {
   // 6桁のルーム番号
@@ -183,8 +190,11 @@ if (onlineIsHost) {
 }
 
 // 新しいルームを作成する
+
 async function createRoom() {
   if (busy) return;
+
+  let step = "名前の確認";
 
   setBusy(true);
   showStatus("ルームを作成しています…");
@@ -192,18 +202,27 @@ async function createRoom() {
   try {
     const name = getPlayerName();
 
-console.log("① 匿名認証開始");
-const user = await getUser();
-console.log("② 匿名認証成功");
+    step = "匿名認証";
+    console.log("① 匿名認証開始");
+
+    const user = await getUser();
+
+    console.log("② 匿名認証成功");
 
     let roomCode = null;
 
-    // 万一ルーム番号が重複したら再発行
+    // 新しい6桁のルーム番号を発行
+    step = "ルーム情報の作成";
+
     for (let attempt = 0; attempt < 5; attempt++) {
       const candidate = randomRoomCode();
 
       try {
-        console.log("③ データベースに書き込み開始");
+        console.log(
+          "③ ルーム情報を書き込み：",
+          candidate
+        );
+
         await set(
           ref(db, `rooms/${candidate}/meta`),
           {
@@ -215,44 +234,84 @@ console.log("② 匿名認証成功");
 
         roomCode = candidate;
         break;
+
       } catch (error) {
-        // 番号衝突以外の設定エラーでも失敗しうる
-        if (error.code !== "PERMISSION_DENIED" &&
-            error.code !== "permission-denied") {
-          throw error;
-        }
+        console.error(
+          "ルーム情報の作成に失敗：",
+          error
+        );
+
+        // 番号衝突以外の問題もあり得るため、
+        // 自動で繰り返さずエラーを表示する
+        throw error;
       }
     }
 
     if (!roomCode) {
       throw new Error(
-        "ルームを作成できません。Firebaseのルールを確認してください。"
+        "ルーム番号を作成できませんでした。"
       );
     }
 
+    console.log("④ ルーム情報の作成成功");
 
-console.log("④ ルーム作成成功");
+    // 自分を参加者として登録
+    step = "参加者の登録";
 
+    console.log("⑤ 参加者登録開始");
 
-await registerMember(roomCode, name, user.uid);
+    await registerMember(
+      roomCode,
+      name,
+      user.uid
+    );
 
-console.log("⑤ 参加者登録成功");
+    console.log("⑥ 参加者登録成功");
 
-// ルーム作成時の詳細設定を保存
-await set(
-  ref(db, `rooms/${roomCode}/settings`),
-  collectOnlineSettings()
-);
+    // 初期設定をFirebaseに保存
+    step = "ゲーム設定の保存";
 
-showLobby(roomCode);
+    console.log("⑦ ゲーム設定の保存開始");
 
+    const initialSettings = collectOnlineSettings();
+
+    console.log(
+      "保存する設定：",
+      initialSettings
+    );
+
+    await set(
+      ref(db, `rooms/${roomCode}/settings`),
+      initialSettings
+    );
+
+    console.log("⑧ ゲーム設定の保存成功");
+
+    // すべて成功してから待機画面へ移動
+    showLobby(roomCode);
 
   } catch (error) {
-    showStatus("エラー：" + error.message);
+    console.error(
+      `${step}でエラー：`,
+      error
+    );
+
+    if (error.code === "PERMISSION_DENIED" ||
+        error.code === "permission-denied") {
+      showStatus(
+        `${step}に失敗しました。Firebaseの設定を確認してください。`
+      );
+    } else {
+      showStatus(
+        `${step}に失敗しました：${error.message}`
+      );
+    }
+
   } finally {
     setBusy(false);
   }
 }
+
 
 
 async function joinRoom() {

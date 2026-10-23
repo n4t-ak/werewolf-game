@@ -612,20 +612,23 @@ try {
 
     showStatus("役職を配布しました。");
 
+ 
+
   } catch (error) {
-  console.error("役職配布に失敗：", error);
-
-  showStatus(
-    "ゲームを開始できませんでした。役職配布の処理でエラーが発生しました。"
-  );
-
-  roleErrorBox.textContent =
-    "ゲームを開始できませんでした。もう一度お試しください。";
+    console.error("役職配布に失敗：", error);
+    showStatus(
+      "役職配布エラー：" +
+      (error.code || "unknown") +
+      " / " + error.message
+    );
+    roleErrorBox.textContent =
+      "ゲームを開始できませんでした：" + error.message;
   } finally {
     onlineRoleStarted = false;
     validateOnlineRoles();
   }
 }
+
 
 startGameButton.addEventListener(
   "click",
@@ -778,18 +781,38 @@ if (meta.phase === "lobby") {
           ),
           snapshot => {
             
+
 if (snapshot.exists()) {
-  console.log("自分の役職を受信しました");
-  showMyOnlineRole(snapshot.val());
+  const role = snapshot.val();
+  console.log("役職取得成功", {
+    uid: currentUid,
+    role: role
+  });
+  showMyOnlineRole(role);
+  showStatus("");
 } else {
-  console.warn("自分の役職データが見つかりません");
-  showStatus("役職を取得できませんでした。");
+  console.error("役職データが存在しません", {
+    room: currentRoom,
+    uid: currentUid
+  });
+  showStatus("自分の役職が見つかりません。");
 }
 
+
           },
-          error => {
-            showStatus("役職取得エラー：" + error.message);
-          }
+          
+error => {
+  console.error("役職取得エラー", {
+    code: error.code,
+    message: error.message,
+    uid: currentUid
+  });
+  showStatus(
+    "役職を読み込めません：" +
+    (error.code || error.message)
+  );
+}
+
         );
 
         watchOnlineReady();
@@ -799,9 +822,16 @@ if (snapshot.exists()) {
 }
       
     },
-    error => {
-      showStatus("進行同期エラー：" + error.message);
-    }
+    
+error => {
+  console.error("進行同期エラー：", error);
+  showStatus(
+    "進行同期エラー：" +
+    (error.code || "unknown") +
+    " / " + error.message
+  );
+}
+
   );
 }
 

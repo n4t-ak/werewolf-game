@@ -4,131 +4,88 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  
   <title>人狼ゲーム</title>
-
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
 </head>
-
 <body>
-
-<!-- ゲームモード選択画面 -->
-<div id="game-mode-screen">
-  <div class="game-mode-panel">
-    <h1>人狼ゲーム</h1>
-
-    <p>ゲームモードを選択してください</p>
-
-    <a href="./online.html" class="game-mode-btn online-mode-btn">
-      オンラインで遊ぶ
-    </a>
-
-    <button
-      id="single-device-mode"
-      class="game-mode-btn single-mode-btn"
-      type="button"
-    >
-      一台で遊ぶ
-    </button>
+  <!-- ゲームモード選択 -->
+  <div id="game-mode-screen">
+    <div class="game-mode-panel">
+      <h1>人狼ゲーム</h1>
+      <p>ゲームモードを選択してください</p>
+      <a href="./online.html" class="game-mode-btn online-mode-btn">
+        オンラインで遊ぶ
+      </a>
+      <button id="single-device-mode" class="game-mode-btn single-mode-btn" type="button">
+        一台で遊ぶ
+      </button>
+    </div>
   </div>
-</div>
+
+  <!-- オフラインの人数選択画面でのみ表示 -->
+  <button id="back-to-game-mode" type="button" hidden>
+    ← ゲームモード選択に戻る
+  </button>
 
   <div class="app-shell">
-
     <header class="app-header">
       <div class="brand-mark">☾</div>
-
       <h1>人狼ゲーム</h1>
-
-      <p class="subtitle">
-        闇に潜む人狼を見つけ出せ。
-      </p>
+      <p class="subtitle">闇に潜む人狼を見つけ出せ。</p>
     </header>
-
     <main class="game-card">
-
       <div id="game">
         <h2>プレイヤー数を選択</h2>
-
         <p>3〜20人でゲームを開始できます。</p>
-
-        <label class="field-label" for="count">
-          参加人数
-        </label>
-
-        <div class="number-field">
-          
-<div class="count-selector">
-  <button id="initial-count-minus" class="count-adjust" type="button">−</button>
-
-  <div class="count-display">
-    <input type="number" id="count" min="3" max="20" value="6">
-    <span>人</span>
-  </div>
-
-  <button id="initial-count-plus" class="count-adjust" type="button">＋</button>
-</div>
-
-          <span>人</span>
+        <label class="field-label" for="count">参加人数</label>
+        <div class="count-selector">
+          <button id="initial-count-minus" class="count-adjust" type="button">−</button>
+          <div class="count-display">
+            <input type="number" id="count" min="3" max="20" value="6">
+            <span>人</span>
+          </div>
+          <button id="initial-count-plus" class="count-adjust" type="button">＋</button>
         </div>
-
-
-<a class="online-mode-link" href="./online.html">
-  オンラインで遊ぶ
-</a>
-
-
-        <button id="start">
-          次へ進む →
-        </button>
+        <button id="start" type="button">次へ進む →</button>
       </div>
-
     </main>
-
   </div>
 
+  <script>
+    (() => {
+      const modeScreen = document.getElementById("game-mode-screen");
+      const singleButton = document.getElementById("single-device-mode");
+      const backButton = document.getElementById("back-to-game-mode");
+      const game = document.getElementById("game");
+
+      function updateBackButton() {
+        const showingModeSelection = !modeScreen.hidden;
+        const showingPlayerCount = !!game.querySelector(".count-selector");
+        const shouldShow = !showingModeSelection && showingPlayerCount;
+        if (backButton.hidden === shouldShow) {
+          backButton.hidden = !shouldShow;
+        }
+      }
+
+      singleButton.addEventListener("click", () => {
+        modeScreen.hidden = true;
+        updateBackButton();
+      });
+
+      backButton.addEventListener("click", () => {
+        modeScreen.hidden = false;
+        updateBackButton();
+      });
+
+      const observer = new MutationObserver(updateBackButton);
+      observer.observe(game, {
+        childList: true,
+        subtree: true
+      });
+
+      updateBackButton();
+    })();
+  </script>
 </body>
-
-<!-- ゲームモード選択に戻る -->
-<button id="back-to-game-mode" type="button" hidden>
-  ← ゲームモード選択に戻る
-</button>
-
-<script>
-  const backToGameMode =
-    document.getElementById("back-to-game-mode");
-
-  const singleDeviceMode =
-    document.getElementById("single-device-mode");
-
-  const gameModeScreen =
-    document.getElementById("game-mode-screen");
-
-  // 一台で遊ぶを選択した場合
-  singleDeviceMode.addEventListener("click", () => {
-    backToGameMode.hidden = false;
-  });
-
-  // ゲームモード選択画面に戻る
-  backToGameMode.addEventListener("click", () => {
-    gameModeScreen.hidden = false;
-    backToGameMode.hidden = true;
-  });
-</script>
-
-<script>
-  document.getElementById("single-device-mode")
-    .addEventListener("click", () => {
-
-      // ゲームモード選択画面を閉じる
-      document.getElementById("game-mode-screen")
-        .hidden = true;
-
-      // 既存の一台用ゲーム画面を表示
-      // 現在の人数選択機能をそのまま使用する
-    });
-</script>
-
 </html>

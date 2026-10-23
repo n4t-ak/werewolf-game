@@ -3,8 +3,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>オンライン人狼</title>
   <link rel="stylesheet" href="./style.css">
@@ -13,104 +12,74 @@
   <main class="app-shell">
     <header class="app-header">
       <h1>オンライン人狼</h1>
-      <p class="subtitle">
-        自分のスマホからルームに参加
-      </p>
+      <p class="subtitle">自分のスマホからルームに参加</p>
     </header>
 
     <section class="game-card">
       <div id="online-game">
 
-       
-<!-- ルーム選択画面 -->
-<div id="entry-screen">
+        <!-- ルーム選択・作成・参加画面 -->
+        <div id="entry-screen">
 
-  <div id="online-menu-screen">
-    <h2>オンラインルーム</h2>
-    <p class="online-menu-description">
-      遊び方を選択してください。
-    </p>
+          <!-- メニュー -->
+          <div id="online-menu-screen">
+            <h2>オンラインルーム</h2>
+            <p class="online-menu-description">
+              遊び方を選択してください。
+            </p>
+            <button id="open-create-room" type="button">
+              ＋ 新しいルームを作成
+            </button>
+            <button id="open-join-room" type="button" class="online-secondary-button">
+              → ルームに参加
+            </button>
+          </div>
 
-    <button id="open-create-room" type="button">
-      ＋ 新しいルームを作成
-    </button>
+          <!-- ルーム作成 -->
+          <div id="online-create-screen" hidden>
+            <h2>新しいルームを作成</h2>
+            <label class="field-label" for="online-name">
+              プレイヤー名
+            </label>
+            <input id="online-name" type="text" maxlength="20"
+                   placeholder="名前を入力" autocomplete="nickname">
+            <button id="create-room" type="button">
+              ルームを作成
+            </button>
+            <button id="back-from-create" type="button" class="online-back-menu">
+              ← 戻る
+            </button>
+          </div>
 
-    <button id="open-join-room" type="button"
-            class="online-secondary-button">
-      → ルームに参加
-    </button>
-  </div>
+          <!-- ルーム参加 -->
+          <div id="online-join-screen" hidden>
+            <h2>ルームに参加</h2>
+            <label class="field-label" for="online-join-name">
+              プレイヤー名
+            </label>
+            <input id="online-join-name" type="text" maxlength="20"
+                   placeholder="名前を入力" autocomplete="nickname">
+            <label class="field-label" for="room-code">
+              ルーム番号
+            </label>
+            <input id="room-code" type="text" inputmode="numeric"
+                   maxlength="6" placeholder="6桁の番号">
+            <button id="join-room" type="button">
+              参加する
+            </button>
+            <button id="back-from-join" type="button" class="online-back-menu">
+              ← 戻る
+            </button>
+          </div>
+        </div>
 
-  <!-- ルーム作成画面 -->
-  <div id="online-create-screen" hidden>
-    <h2>新しいルームを作成</h2>
-
-    <label class="field-label" for="online-name">
-      プレイヤー名
-    </label>
-    <input
-      id="online-name"
-      type="text"
-      maxlength="20"
-      placeholder="名前を入力"
-      autocomplete="nickname"
-    >
-
-    <button id="create-room" type="button">
-      ルームを作成
-    </button>
-
-    <button id="back-from-create" type="button"
-            class="online-back-menu">
-      ← 戻る
-    </button>
-  </div>
-
-  <!-- ルーム参加画面 -->
-  <div id="online-join-screen" hidden>
-    <h2>ルームに参加</h2>
-
-    <label class="field-label" for="online-join-name">
-      プレイヤー名
-    </label>
-    <input
-      id="online-join-name"
-      type="text"
-      maxlength="20"
-      placeholder="名前を入力"
-      autocomplete="nickname"
-    >
-
-    <label class="field-label" for="room-code">
-      ルーム番号
-    </label>
-    <input
-      id="room-code"
-      type="text"
-      inputmode="numeric"
-      maxlength="6"
-      placeholder="6桁の番号"
-    >
-
-    <button id="join-room" type="button">
-      参加する
-    </button>
-
-    <button id="back-from-join" type="button"
-            class="online-back-menu">
-      ← 戻る
-    </button>
-  </div>
-
-</div>
-
-
+        <!-- ルーム待機画面 -->
         <div id="lobby-screen" hidden>
           <h2>ルーム待機画面</h2>
           <p>ルーム番号</p>
           <div id="display-room-code"></div>
 
-          <button id="copy-room-link">
+          <button id="copy-room-link" type="button">
             招待リンクをコピー
           </button>
 
@@ -120,231 +89,184 @@
           <p id="lobby-notice">
             全員が参加するまで待ってください。
           </p>
-          
-<!-- 参加者専用：閲覧だけできる役職設定 -->
-<div id="online-guest-settings" hidden>
-  <h3>今回の役職構成</h3>
 
-  <p class="online-settings-help">
-    ホストが設定した役職と人数です。
-  </p>
+          <!-- 参加者用：閲覧のみ -->
+          <div id="online-guest-settings" hidden>
+            <h3>今回の役職構成</h3>
+            <p class="online-settings-help">
+              ホストが設定した役職と人数です。
+            </p>
+            <div id="online-guest-role-list"></div>
+            <p id="online-guest-villagers"></p>
+            <h3>詳細設定</h3>
+            <div id="online-guest-extras"></div>
+            <p class="online-settings-help">
+              設定を変更できるのはホストだけです。
+            </p>
+          </div>
 
-  <div id="online-guest-role-list"></div>
+          <!-- ホスト用：役職設定 -->
+          <div id="online-role-settings" hidden>
+            <h3>役職設定</h3>
+            <p>各役職の人数を設定してください。</p>
+            <div id="online-role-list"></div>
+            <p id="online-villager-count"></p>
 
-  <p id="online-guest-villagers"></p>
+            <!-- 詳細設定 -->
+            <details class="advanced-settings online-advanced-settings">
+              <summary>詳細設定</summary>
+              <div class="online-extra-settings">
 
-  <h3>詳細設定</h3>
-  <div id="online-guest-extras"></div>
+                <div class="setting-item">
+                  <div class="setting-description">
+                    <strong>狂人が人狼を把握できる</strong>
+                    <p>狂人に人狼の名前を公開します。</p>
+                  </div>
+                  <label class="setting-switch">
+                    <input type="checkbox" id="online-madman-knows-wolves">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
 
-  <p class="online-settings-help">
-    設定を変更できるのはホストだけです。
-  </p>
-</div>
+                <div class="setting-item">
+                  <div class="setting-description">
+                    <strong>騎士の連続護衛を許可</strong>
+                    <p>前の夜と同じ相手も護衛できます。</p>
+                  </div>
+                  <label class="setting-switch">
+                    <input type="checkbox" id="online-consecutive-guard">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
 
-<!-- ホスト専用の役職設定 -->
-<div id="online-role-settings" hidden>
-  <h3>役職設定</h3>
-  <p>各役職の人数を設定してください。</p>
+                <div class="setting-item">
+                  <div class="setting-description">
+                    <strong>役職欠けを有効にする</strong>
+                    <p>人狼以外の特殊役職が1つ欠けます。</p>
+                  </div>
+                  <label class="setting-switch">
+                    <input type="checkbox" id="online-role-missing">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
 
-  <div id="online-role-list"></div>
+                <div class="setting-item">
+                  <div class="setting-description">
+                    <strong>投票履歴を公開する</strong>
+                    <p>誰が誰に投票したかを公開します。</p>
+                  </div>
+                  <label class="setting-switch">
+                    <input type="checkbox" id="online-public-votes">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
 
-  <p id="online-villager-count"></p>
+                <div class="setting-item">
+                  <div class="setting-description">
+                    <strong>ランダム事件カード</strong>
+                    <p>毎朝、議論時間が変化することがあります。</p>
+                  </div>
+                  <label class="setting-switch">
+                    <input type="checkbox" id="online-random-events">
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
 
+              </div>
+            </details>
 
-<h3>詳細設定</h3>
+            <p id="online-role-error" role="alert"></p>
+            <button id="online-start-game" type="button">
+              役職を配布してゲームを開始
+            </button>
+          </div>
+        </div>
+        <!-- ルーム待機画面ここまで -->
 
+        <!-- 全員共通：役職確認画面 -->
+        <div id="online-role-reveal" hidden>
+          <h3>あなたの役職</h3>
+          <div class="online-role-card">
+            <strong id="online-my-role">確認中...</strong>
+            <p id="online-my-role-description"></p>
+          </div>
 
-<!-- 折りたたみ式の詳細設定 -->
-<details class="advanced-settings online-advanced-settings">
-  <summary>詳細設定</summary>
+          <button id="online-ready-button" type="button">
+            役職を確認しました
+          </button>
 
-  <div class="online-extra-settings">
+          <button id="online-go-night" type="button" hidden disabled>
+            全員の確認完了・初夜へ進む
+          </button>
 
-    <div class="setting-item">
-      <div class="setting-description">
-        <strong>狂人が人狼を把握できる</strong>
-        <p>狂人に人狼の名前を公開します。</p>
-      </div>
-
-      <label class="setting-switch">
-        <input
-          type="checkbox"
-          id="online-madman-knows-wolves"
-        >
-        <span class="switch-slider"></span>
-      </label>
-    </div>
-
-    <div class="setting-item">
-      <div class="setting-description">
-        <strong>騎士の連続護衛を許可</strong>
-        <p>前の夜と同じ相手も護衛できます。</p>
-      </div>
-
-      <label class="setting-switch">
-        <input
-          type="checkbox"
-          id="online-consecutive-guard"
-        >
-        <span class="switch-slider"></span>
-      </label>
-    </div>
-
-    <div class="setting-item">
-      <div class="setting-description">
-        <strong>役職欠けを有効にする</strong>
-        <p>人狼以外の特殊役職が1つ欠けます。</p>
-      </div>
-
-      <label class="setting-switch">
-        <input
-          type="checkbox"
-          id="online-role-missing"
-        >
-        <span class="switch-slider"></span>
-      </label>
-    </div>
-
-    <div class="setting-item">
-      <div class="setting-description">
-        <strong>投票履歴を公開する</strong>
-        <p>誰が誰に投票したかを公開します。</p>
-      </div>
-
-      <label class="setting-switch">
-        <input
-          type="checkbox"
-          id="online-public-votes"
-        >
-        <span class="switch-slider"></span>
-      </label>
-    </div>
-
-    <div class="setting-item">
-      <div class="setting-description">
-        <strong>ランダム事件カード</strong>
-        <p>毎朝、議論時間が変化することがあります。</p>
-      </div>
-
-      <label class="setting-switch">
-        <input
-          type="checkbox"
-          id="online-random-events"
-        >
-        <span class="switch-slider"></span>
-      </label>
-    </div>
-
-  </div>
-</details>
-
-
-
-  <p id="online-role-error" role="alert"></p>
-
-  <button id="online-start-game">
-    役職を配布してゲームを開始
-  </button>
-
-</div>
-<!-- ここで lobby-screen を閉じる -->
-
-<!-- 全員共通の役職確認画面 -->
-<div id="online-role-reveal" hidden>
-  <h3>あなたの役職</h3>
-
-  <div class="online-role-card">
-    <strong id="online-my-role">確認中...</strong>
-    <p id="online-my-role-description"></p>
-  </div>
-
-  <button id="online-ready-button">
-    役職を確認しました
-  </button>
-
-  <button id="online-go-night" type="button" hidden disabled>
-  全員の確認完了・初夜へ進む
-</button>
-
-  <h3 id="online-ready-count">確認状況</h3>
-  <div id="online-ready-members"></div>
-
-  <p class="online-wait-message">
-    全員の役職確認が終了するまで待機してください。
-  </p>
-</div>
-
-<!-- 初夜の行動画面 -->
-<div id="online-night-screen" hidden>
-  <h2>初夜</h2>
-
-  <p id="online-night-role"></p>
-  <p id="online-night-message"></p>
-
-  <div id="online-night-action-area" hidden>
-    <label class="field-label" for="online-night-target">
-      行動する相手
-    </label>
-
-    <select id="online-night-target">
-      <option value="">相手を選択してください</option>
-    </select>
-
-    <button id="online-submit-night" type="button">
-      行動を確定する
-    </button>
-  </div>
-
-  <p id="online-night-result" role="status"></p>
-
-  <p class="online-wait-message">
-    全員の行動が終わるまで待機してください。
-  </p>
-</div>
-
-
-<!-- 全員共通の役職確認画面 -->
-<div id="online-role-reveal" hidden>
-  <h3>あなたの役職</h3>
-
-  <div class="online-role-card">
-    <strong id="online-my-role">確認中...</strong>
-    <p id="online-my-role-description"></p>
-  </div>
-
-  <button id="online-ready-button">
-    役職を確認しました
-  </button>
-
-  <h3 id="online-ready-count">確認状況</h3>
-  <div id="online-ready-members"></div>
-
-  <p class="online-wait-message">
-    全員の役職確認が終了するまで待機してください。
-  </p>
-</div>
-
+          <h3 id="online-ready-count">確認状況</h3>
+          <div id="online-ready-members"></div>
+          <p class="online-wait-message">
+            全員の役職確認が終了するまで待機してください。
+          </p>
         </div>
 
+        <!-- 全員共通：初夜の行動画面 -->
+        <div id="online-night-screen" hidden>
+          <h2>初夜</h2>
+          <p id="online-night-role"></p>
+          <p id="online-night-message"></p>
+
+          <div id="online-night-action-area" hidden>
+            <label class="field-label" for="online-night-target">
+              行動する相手
+            </label>
+            <select id="online-night-target">
+              <option value="">相手を選択してください</option>
+            </select>
+            <button id="online-submit-night" type="button">
+              行動を確定する
+            </button>
+          </div>
+
+          <p id="online-night-result" role="status"></p>
+          <p class="online-wait-message">
+            全員の行動が終わるまで待機してください。
+          </p>
+        </div>
+
+        <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>
       </div>
     </section>
-
-    
-<footer class="app-footer">
-  <a href="./index.html" class="online-back-button">
-    ← 1台モードへ戻る
-  </a>
-</footer>
-
   </main>
 
- <script type="module" src="./online.js"></script>
+  <!-- ルーム選択・作成・参加時のみ表示 -->
+  <a href="./index.html" id="back-to-game-mode-online">
+    ← ゲームモード選択に戻る
+  </a>
 
-<a href="./index.html" id="back-to-game-mode-online">
-  ← ゲームモード選択に戻る
-</a>
+  <!-- Firebase・オンラインゲーム処理 -->
+  <script type="module" src="./online.js"></script>
 
+  <!-- 戻るボタンの表示制御 -->
+  <script>
+    (() => {
+      const backButton = document.getElementById("back-to-game-mode-online");
+      const entryScreen = document.getElementById("entry-screen");
+
+      if (!backButton || !entryScreen) return;
+
+      function updateBackButton() {
+        const shouldHide = entryScreen.hidden;
+        if (backButton.hidden !== shouldHide) {
+          backButton.hidden = shouldHide;
+        }
+      }
+
+      const observer = new MutationObserver(updateBackButton);
+      observer.observe(entryScreen, {
+        attributes: true,
+        attributeFilter: ["hidden"]
+      });
+
+      updateBackButton();
+    })();
+  </script>
 </body>
-
 </html>

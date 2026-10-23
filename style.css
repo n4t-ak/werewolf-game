@@ -1040,3 +1040,39 @@ input[type="number"] { width: 100px; }
     transition: none !important;
   }
 }
+
+/* 戻るボタンの共通デザイン */
+#back-to-game-mode,
+#back-to-game-mode-online {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  width: auto;
+  min-height: 42px;
+  margin: 0;
+  padding: 10px 14px;
+  background: #374151;
+  color: #ffffff;
+  border: 1px solid #64748b;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: none;
+}
+
+/* JavaScriptでhiddenを付けたら必ず非表示 */
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  #back-to-game-mode,
+  #back-to-game-mode-online {
+    top: 10px;
+    left: 10px;
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+}

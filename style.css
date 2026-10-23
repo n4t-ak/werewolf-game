@@ -1764,3 +1764,106 @@ textarea:focus-visible {
 #game .review-role-row .review-team-third {
   color: #ffd166 !important;
 }
+
+.online-mode-link {
+  display: block;
+  width: min(100%, 380px);
+  margin: 16px auto;
+  padding: 16px;
+  text-align: center;
+  color: #ffffff;
+  background: #2f45b5;
+  border: 1px solid #320895;
+  border-radius: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+
+/* オンライン人狼の画面 */
+
+#online-game {
+  width: 100%;
+  text-align: center;
+}
+
+#online-game [hidden] {
+  display: none !important;
+}
+
+#online-game input {
+  display: block;
+  width: 100%;
+  max-width: 380px;
+  margin: 12px auto;
+  font-size: 18px;
+}
+
+#online-game .field-label {
+  display: block;
+  margin-top: 22px;
+  text-align: left;
+}
+
+#online-game #room-code {
+  font-size: 28px;
+  text-align: center;
+  letter-spacing: 0.15em;
+  font-weight: 800;
+}
+
+#display-room-code {
+  padding: 20px 10px;
+  margin: 18px 0;
+  color: #ff829a;
+  background: #222b40;
+  border: 2px solid #e34f62;
+  border-radius: 14px;
+  font-size: clamp(32px, 9vw, 48px);
+  letter-spacing: 0.12em;
+  font-weight: 900;
+}
+
+#online-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.online-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px;
+  background: #252d40;
+  border: 1px solid #46516a;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.online-member strong {
+  color: #ffffff;
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+
+.online-member span {
+  color: #ff9dad;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+#online-status {
+  color: #ffd39b;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+#lobby-notice {
+  color: #b0b9cb;
+  font-size: 14px;
+  margin-top: 20px;
+}

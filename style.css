@@ -2152,3 +2152,122 @@ textarea:focus-visible {
 #online-game [hidden] {
   display: none !important;
 }
+
+
+/* ========================================
+   オンライン：折りたたみ式詳細設定
+======================================== */
+
+#online-game .online-advanced-settings {
+  margin: 24px 0;
+  padding: 16px;
+  background: #1d263a;
+  border: 1px solid #46516c;
+  border-radius: 14px;
+}
+
+#online-game .online-advanced-settings summary {
+  color: #ffe7b4;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+}
+
+#online-game .online-extra-settings {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 0 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+/* 各設定の配置 */
+#online-game .online-advanced-settings .setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 17px 0;
+  border-bottom: 1px solid #46516c;
+}
+
+#online-game .online-advanced-settings .setting-item:last-child {
+  border-bottom: none;
+}
+
+#online-game .online-advanced-settings .setting-description {
+  flex: 1;
+  min-width: 0;
+}
+
+#online-game .online-advanced-settings .setting-description strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+#online-game .online-advanced-settings .setting-description p {
+  margin: 6px 0 0;
+  color: #acb6cc;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* スライドスイッチ */
+#online-game .online-advanced-settings .setting-switch {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 52px;
+  height: 30px;
+  cursor: pointer;
+}
+
+#online-game .online-advanced-settings .setting-switch input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+#online-game .online-advanced-settings .switch-slider {
+  position: absolute;
+  inset: 0;
+  background: #47536a;
+  border-radius: 30px;
+  pointer-events: none;
+  transition: background 0.25s ease;
+}
+
+#online-game .online-advanced-settings .switch-slider::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+}
+
+/* ON状態 */
+#online-game .online-advanced-settings
+.setting-switch input:checked + .switch-slider {
+  background: #e36a71;
+}
+
+#online-game .online-advanced-settings
+.setting-switch input:checked + .switch-slider::before {
+  transform: translateX(22px);
+}
+
+/* キーボード操作時 */
+#online-game .online-advanced-settings
+.setting-switch input:focus-visible + .switch-slider {
+  outline: 3px solid #f8c794;
+  outline-offset: 3px;
+}

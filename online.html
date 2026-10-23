@@ -99,49 +99,91 @@
 
 <h3>詳細設定</h3>
 
-<div class="online-extra-settings">
 
-  <label class="online-extra-row">
-    <span>
-      <strong>狂人が人狼を把握できる</strong>
-      <small>狂人に人狼の名前を公開します。</small>
-    </span>
-    <input type="checkbox" id="online-madman-knows-wolves">
-  </label>
+<!-- 折りたたみ式の詳細設定 -->
+<details class="advanced-settings online-advanced-settings">
+  <summary>詳細設定</summary>
 
-  <label class="online-extra-row">
-    <span>
-      <strong>騎士の連続護衛を許可</strong>
-      <small>前の夜と同じ相手も護衛できます。</small>
-    </span>
-    <input type="checkbox" id="online-consecutive-guard">
-  </label>
+  <div class="online-extra-settings">
 
-  <label class="online-extra-row">
-    <span>
-      <strong>役職欠けを有効にする</strong>
-      <small>人狼以外の特殊役職が1つ欠けます。</small>
-    </span>
-    <input type="checkbox" id="online-role-missing">
-  </label>
+    <div class="setting-item">
+      <div class="setting-description">
+        <strong>狂人が人狼を把握できる</strong>
+        <p>狂人に人狼の名前を公開します。</p>
+      </div>
 
-  <label class="online-extra-row">
-    <span>
-      <strong>投票履歴を公開する</strong>
-      <small>誰が誰に投票したかを公開します。</small>
-    </span>
-    <input type="checkbox" id="online-public-votes">
-  </label>
+      <label class="setting-switch">
+        <input
+          type="checkbox"
+          id="online-madman-knows-wolves"
+        >
+        <span class="switch-slider"></span>
+      </label>
+    </div>
 
-  <label class="online-extra-row">
-    <span>
-      <strong>ランダム事件カード</strong>
-      <small>毎朝、議論時間が変化することがあります。</small>
-    </span>
-    <input type="checkbox" id="online-random-events">
-  </label>
+    <div class="setting-item">
+      <div class="setting-description">
+        <strong>騎士の連続護衛を許可</strong>
+        <p>前の夜と同じ相手も護衛できます。</p>
+      </div>
 
-</div>
+      <label class="setting-switch">
+        <input
+          type="checkbox"
+          id="online-consecutive-guard"
+        >
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-description">
+        <strong>役職欠けを有効にする</strong>
+        <p>人狼以外の特殊役職が1つ欠けます。</p>
+      </div>
+
+      <label class="setting-switch">
+        <input
+          type="checkbox"
+          id="online-role-missing"
+        >
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-description">
+        <strong>投票履歴を公開する</strong>
+        <p>誰が誰に投票したかを公開します。</p>
+      </div>
+
+      <label class="setting-switch">
+        <input
+          type="checkbox"
+          id="online-public-votes"
+        >
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-description">
+        <strong>ランダム事件カード</strong>
+        <p>毎朝、議論時間が変化することがあります。</p>
+      </div>
+
+      <label class="setting-switch">
+        <input
+          type="checkbox"
+          id="online-random-events"
+        >
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+  </div>
+</details>
+
 
 
   <p id="online-role-error" role="alert"></p>

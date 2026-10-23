@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>オンライン人狼</title>
-  <link rel="stylesheet" href="./style.css">
+  
+<link rel="stylesheet" href="./style.css?v=20261023-2">
+
 </head>
 <body>
   <main class="app-shell">
@@ -232,17 +234,53 @@
 
         <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>
-      </div>
+    
+<p id="online-debug" style="font-size:12px;color:#ffd166;overflow-wrap:anywhere;"></p>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const debug = document.getElementById("online-debug");
+  const entry = document.getElementById("entry-screen");
+  const lobby = document.getElementById("lobby-screen");
+  const role = document.getElementById("online-role-reveal");
+  if (!debug || !entry || !lobby || !role) return;
+
+  function check() {
+    const roleName = document.getElementById("online-my-role");
+    debug.textContent =
+      "診断: ルーム選択=" + !entry.hidden +
+      " / ロビー=" + !lobby.hidden +
+      " / 役職画面=" + !role.hidden +
+      " / 役職=" + (roleName?.textContent || "なし");
+  }
+
+  const observer = new MutationObserver(check);
+  observer.observe(entry, { attributes: true, attributeFilter: ["hidden"] });
+  observer.observe(lobby, { attributes: true, attributeFilter: ["hidden"] });
+  observer.observe(role, { attributes: true, attributeFilter: ["hidden"] });
+  observer.observe(document.getElementById("online-my-role"), {
+    childList: true,
+    characterData: true,
+    subtree: true
+  });
+  check();
+});
+</script>
+  
+    </div>
     </section>
   </main>
 
   <!-- ルーム選択・作成・参加時のみ表示 -->
-  <a href="./index.html" id="back-to-game-mode-online">
-    ← ゲームモード選択に戻る
-  </a>
+  
+<a href="./index.html" id="back-to-game-mode-online" hidden>
+  ← ゲームモード選択に戻る
+</a>
+
 
   <!-- Firebase・オンラインゲーム処理 -->
-  <script type="module" src="./online.js"></script>
+  
+<script type="module" src="./online.js?v=20261023-2"></script>
+
 
   <!-- 戻るボタンの表示制御 -->
   <script>

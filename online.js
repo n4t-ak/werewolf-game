@@ -174,8 +174,14 @@ if (onlineIsHost) {
         name.textContent = member.name;
 
         const mark = document.createElement("span");
-        mark.textContent =
-          uid === currentUid ? "あなた" : "参加中";
+        
+mark.textContent =
+  uid === currentHostUid
+    ? "ホスト"
+    : uid === currentUid
+      ? "あなた"
+      : "参加中";
+
 
         item.append(name, mark);
         membersBox.appendChild(item);

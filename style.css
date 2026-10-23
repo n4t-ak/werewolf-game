@@ -2400,3 +2400,253 @@ textarea:focus-visible {
 #online-game [hidden] {
   display: none !important;
 }
+
+
+/* ========================================
+   ゲームモード選択画面
+======================================== */
+
+#game-mode-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px;
+
+  background: #151923;
+}
+
+#game-mode-screen[hidden] {
+  display: none !important;
+}
+
+.game-mode-panel {
+  width: 100%;
+  max-width: 420px;
+
+  padding: 36px 25px;
+  background: #222b3c;
+  border: 1px solid #435069;
+  border-radius: 18px;
+
+  text-align: center;
+}
+
+.game-mode-panel h1 {
+  margin-bottom: 12px;
+  color: #fff;
+  font-size: 30px;
+}
+
+.game-mode-panel p {
+  margin-bottom: 30px;
+  color: #a8b2c6;
+  font-size: 14px;
+}
+
+.game-mode-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  width: 100%;
+  min-height: 58px;
+  margin-top: 14px;
+  padding: 14px 18px;
+
+  border: 0;
+  border-radius: 10px;
+
+  color: #fff;
+  font-size: 17px;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.online-mode-btn {
+  background: #a73441;
+}
+
+.online-mode-btn:hover {
+  background: #c34453;
+}
+
+.single-mode-btn {
+  background: #37435d;
+  border: 1px solid #69758e;
+}
+
+.single-mode-btn:hover {
+  background: #485772;
+}
+
+@media (max-width: 480px) {
+  .game-mode-panel {
+    padding: 28px 20px;
+  }
+
+  .game-mode-panel h1 {
+    font-size: 26px;
+  }
+}
+
+
+/* オンラインで遊ぶ：青色 */
+.online-mode-btn {
+  background: #1356e6;
+  color: #ffffff;
+}
+
+.online-mode-btn:hover {
+  background: #0044ff;
+}
+
+/* 一台で遊ぶ：赤色 */
+.single-mode-btn {
+  background: #c70d0d;
+  border: none;
+  color: #ffffff;
+}
+
+.single-mode-btn:hover {
+  background: #c30b0b;
+}
+
+/* ========================================
+   ゲームモード選択に戻るボタン
+======================================== */
+
+#back-to-game-mode,
+#back-to-game-mode-online {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+
+  width: auto;
+  min-height: 42px;
+  padding: 10px 14px;
+
+  background: #374151;
+  color: #ffffff;
+  border: 1px solid #64748b;
+  border-radius: 9px;
+
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#back-to-game-mode:hover,
+#back-to-game-mode-online:hover {
+  background: #4b5563;
+}
+
+#back-to-game-mode[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  #back-to-game-mode,
+  #back-to-game-mode-online {
+    top: 10px;
+    left: 10px;
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+}
+
+/* ========================================
+   ゲームモード選択：落ち着いた配色
+======================================== */
+
+/* オンラインで遊ぶ：ネイビーブルー */
+.online-mode-btn {
+  background: #344e70;
+  border: 1px solid #4a6485;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.online-mode-btn:hover {
+  background: #01285b;
+  border-color: #607da1;
+}
+
+/* 一台で遊ぶ：ワインレッド */
+.single-mode-btn {
+  background: #793c49;
+  border: 1px solid #955363;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.single-mode-btn:hover {
+  background: #914b5b;
+  border-color: #ad6878;
+}
+
+
+/* ========================================
+   ゲームモード選択のボタンを既存画面に統一
+======================================== */
+
+/* オンラインで遊ぶ：既存の紺色ボタン */
+.game-mode-panel .online-mode-btn {
+  background: #303b57;
+  color: #ffffff;
+  border: 1px solid #65708b;
+  box-shadow: none;
+}
+
+.game-mode-panel .online-mode-btn:hover {
+  background: #3c4969;
+  border-color: #8e9bb8;
+}
+
+/* 一台で遊ぶ：既存の「次へ進む」ボタン */
+.game-mode-panel .single-mode-btn {
+  background: linear-gradient(110deg, #b8384e, #e15a63);
+  color: #ffffff;
+  border: 1px solid #ef8190;
+  box-shadow: 0 7px 20px #d1405836;
+}
+
+.game-mode-panel .single-mode-btn:hover {
+  background: linear-gradient(110deg, #b8384e, #e15a63);
+  filter: brightness(1.12);
+  box-shadow: 0 12px 24px #d1405850;
+}
+
+
+/* 一台用ゲーム内のオンライン移動リンクを非表示 */
+#game a[href*="online.html"] {
+  display: none !important;
+}
+
+
+/* オンラインで遊ぶ：落ち着いた青色 */
+.game-mode-panel .online-mode-btn {
+  background: #355b8c;
+  color: #ffffff;
+  border: 1px solid #537cad;
+  box-shadow: none;
+}
+
+.game-mode-panel .online-mode-btn:hover {
+  background: #426da3;
+  border-color: #7197c5;
+}

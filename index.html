@@ -14,6 +14,27 @@
 
 <body>
 
+<!-- ゲームモード選択画面 -->
+<div id="game-mode-screen">
+  <div class="game-mode-panel">
+    <h1>人狼ゲーム</h1>
+
+    <p>ゲームモードを選択してください</p>
+
+    <a href="./online.html" class="game-mode-btn online-mode-btn">
+      オンラインで遊ぶ
+    </a>
+
+    <button
+      id="single-device-mode"
+      class="game-mode-btn single-mode-btn"
+      type="button"
+    >
+      一台で遊ぶ
+    </button>
+  </div>
+</div>
+
   <div class="app-shell">
 
     <header class="app-header">
@@ -69,4 +90,45 @@
   </div>
 
 </body>
+
+<!-- ゲームモード選択に戻る -->
+<button id="back-to-game-mode" type="button" hidden>
+  ← ゲームモード選択に戻る
+</button>
+
+<script>
+  const backToGameMode =
+    document.getElementById("back-to-game-mode");
+
+  const singleDeviceMode =
+    document.getElementById("single-device-mode");
+
+  const gameModeScreen =
+    document.getElementById("game-mode-screen");
+
+  // 一台で遊ぶを選択した場合
+  singleDeviceMode.addEventListener("click", () => {
+    backToGameMode.hidden = false;
+  });
+
+  // ゲームモード選択画面に戻る
+  backToGameMode.addEventListener("click", () => {
+    gameModeScreen.hidden = false;
+    backToGameMode.hidden = true;
+  });
+</script>
+
+<script>
+  document.getElementById("single-device-mode")
+    .addEventListener("click", () => {
+
+      // ゲームモード選択画面を閉じる
+      document.getElementById("game-mode-screen")
+        .hidden = true;
+
+      // 既存の一台用ゲーム画面を表示
+      // 現在の人数選択機能をそのまま使用する
+    });
+</script>
+
 </html>

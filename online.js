@@ -511,10 +511,27 @@ function shuffleOnlineRoles(items) {
 }
 
 async function startOnlineRoleGame() {
-  if (!currentRoom || !onlineIsHost ||
-      onlineRoleStarted) return;
+  
+if (!currentRoom || !onlineIsHost || onlineRoleStarted) {
+  console.warn("ゲーム開始条件を満たしていません", {
+    currentRoom,
+    onlineIsHost,
+    onlineRoleStarted
+  });
+  return;
+}
 
-  if (validateOnlineRoles()) return;
+const validationError = validateOnlineRoles();
+
+if (validationError) {
+  showStatus(validationError);
+  console.warn("役職設定エラー：", validationError);
+  return;
+}
+
+showStatus("役職を配布しています…");
+console.log("ゲーム開始処理を開始しました");
+
 
   onlineRoleStarted = true;
   startGameButton.disabled = true;
@@ -596,8 +613,14 @@ try {
     showStatus("役職を配布しました。");
 
   } catch (error) {
-    console.error(error);
-    showStatus("配布エラー：" + error.message);
+  console.error("役職配布に失敗：", error);
+
+  showStatus(
+    "ゲームを開始できませんでした。役職配布の処理でエラーが発生しました。"
+  );
+
+  roleErrorBox.textContent =
+    "ゲームを開始できませんでした。もう一度お試しください。";
   } finally {
     onlineRoleStarted = false;
     validateOnlineRoles();
@@ -730,6 +753,10 @@ if (meta.phase === "lobby") {
 
 
       if (meta.phase === "firstNight") {
+        console.log("役職確認画面へ移動します", {
+  phase: meta.phase,
+  currentUid
+});
         updateGoNightButton();
         // 待機画面から役職確認画面へ
         document.getElementById(
@@ -750,9 +777,15 @@ if (meta.phase === "lobby") {
             `rooms/${currentRoom}/roles/${currentUid}`
           ),
           snapshot => {
-            if (snapshot.exists()) {
-              showMyOnlineRole(snapshot.val());
-            }
+            
+if (snapshot.exists()) {
+  console.log("自分の役職を受信しました");
+  showMyOnlineRole(snapshot.val());
+} else {
+  console.warn("自分の役職データが見つかりません");
+  showStatus("役職を取得できませんでした。");
+}
+
           },
           error => {
             showStatus("役職取得エラー：" + error.message);

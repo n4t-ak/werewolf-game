@@ -1,3 +1,7 @@
+
+/* ==========================================
+   人狼ゲーム 共通デザイン
+========================================== */
 :root {
   color-scheme: dark;
   font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif;
@@ -6,15 +10,20 @@
   --muted: #acb6cc;
   --accent: #e36a71;
   --line: #34405a;
+  --surface: #222b40;
+  --secondary: #303b57;
 }
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
+  width: 100%;
   color: var(--ink);
-  background: radial-gradient(ellipse at 50% -10%, #24324c 0, transparent 54%),
-              linear-gradient(150deg, #0a101c, #171a2d 70%, #100f1d);
+  background: radial-gradient(ellipse at 50% -10%, #24324c, transparent 54%), linear-gradient(150deg, #0a101c, #171a2d 70%, #100f1d);
+  overflow-x: clip;
 }
 body::before {
   content: "";
@@ -22,568 +31,220 @@ body::before {
   inset: 0;
   z-index: -1;
   opacity: .2;
-  background-image: radial-gradient(#e9ebfa 0.7px, transparent 0.7px);
+  background-image: radial-gradient(#e9ebfa .7px, transparent .7px);
   background-size: 38px 38px;
   pointer-events: none;
 }
-.app-shell { width: min(100% - 32px, 520px); margin: 0 auto; padding: 42px 0 28px; }
-.app-header { text-align: center; padding: 0 0 24px; }
-.brand-mark { display: inline-grid; place-items: center; color: #ffe7b4; font-size: 44px; width: 66px; height: 66px; border-radius: 50%; background: #ffffff0a; border: 1px solid #ffffff1c; box-shadow: 0 0 38px #e8c48f21; }
-.eyebrow { margin: 14px 0 6px; font-size: 10px; letter-spacing: .25em; color: #d0b6a6; font-weight: 700; }
-h1 { font-size: clamp(29px, 7vw, 42px); margin: 0; font-weight: 800; letter-spacing: .09em; }
-.subtitle { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
-.game-card { padding: clamp(20px, 5vw, 34px); background: linear-gradient(145deg, #222b40ed, #181f31f4); border: 1px solid #46516c; border-radius: 24px; box-shadow: 0 24px 65px #0006, inset 0 1px #ffffff10; }
-#game { min-height: 220px; text-align: center; }
-#game h2 { margin: 4px 0 17px; font-size: clamp(22px, 5vw, 27px); line-height: 1.45; }
-#game h3 { margin-top: 22px; font-size: 17px; }
-
-/* 通常の説明文 */
-#game > p {
-  color: #aeb8cc;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1.7;
-}
-
-#game > p { color: var(--muted); }
-button { display: block; width: min(100%, 380px); margin: 20px auto 0; padding: 15px 20px; background: linear-gradient(110deg, #b8384e, #e15a63); color: #fff; border: 1px solid #ef8190; border-radius: 13px; font: inherit; font-size: 16px; font-weight: 750; cursor: pointer; box-shadow: 0 7px 20px #d1405836; transition: transform .18s ease, filter .18s ease, box-shadow .18s ease; }
-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.12); box-shadow: 0 12px 24px #d1405850; }
-button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #f8c794; outline-offset: 3px; }
-button:disabled { opacity: .48; cursor: not-allowed; filter: grayscale(.4); }
-.field-label { display: block; font-size: 13px; color: #d6dbe8; font-weight: 650; margin: 25px 0 12px; }
-.number-field { position: relative; display: flex; align-items: center; justify-content: center; width: 160px; margin: 0 auto 12px; }
-.number-field input { width: 100%; padding: 16px 42px 16px 18px; text-align: center; font-size: 30px; font-weight: 700; }
-.number-field span { position: absolute; right: 22px; color: var(--muted); pointer-events: none; }
-input, select, textarea { color: var(--ink); font: inherit; background: #101728; border: 1px solid #485570; border-radius: 10px; padding: 12px 14px; }
-input[type="number"] { width: 100px; }
-#name-inputs { display: flex; flex-direction: column; gap: 12px; margin: 24px auto; max-width: 320px; }
-.name-input { width: 100%; font-size: 16px; }
-#role-settings { display: flex; flex-direction: column; gap: 11px; margin: 22px 0; }
-.role-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 15px; background: #101728a8; border: 1px solid var(--line); border-radius: 12px; }
-.role-row label { text-align: left; }
-.role-count { width: 78px!important; text-align: center; }
-.error-text { color: #ff9ca4!important; font-size: 14px; }
-.role { font-size: 30px; font-weight: 800; }
-.choice-list { display: grid; gap: 10px; margin: 22px 0 6px; }
-.choice-button { margin: 0; width: 100%; background: #303b57; border: 1px solid #566785; box-shadow: none; }
-.survivor-list { text-align: left; margin: 18px 0; }
-.survivor, .eliminated { margin: 8px 0; padding: 12px; border-radius: 9px; }
-.survivor { color: #a9edc6; background: #183d34a8; }
-.eliminated { color: #f5aab4; background: #542b37a8; }
-.wolf-opinion { text-align: left; background: #402936; border: 1px solid #8e4b5e; border-radius: 12px; padding: 14px; margin: 12px 0; }
-.wolf-opinion strong { color: #ffa8ae; }
-.wolf-opinion p { color: #f2dbe3!important; margin: 7px 0; }
-.wolf-select { width: 100%; display: block; margin: 12px auto; }
-.wolf-comment { width: 100%; margin: 12px 0; }
-.wolf-explanation { background: #422c37; border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px; text-align: left; line-height: 1.8; color: white!important; }
-
-.private-role-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-
-  margin-bottom: 24px;
-  padding: 20px;
-
-  background: rgba(130, 35, 48, 0.18);
-  border: 2px solid #d94b5e;
-  border-radius: 14px;
-
-  text-align: center;
-}
-
-.private-role-badge span { font-size: 13px; color: #f3ccd4; }
-
-/* 自分の役職を強調 */
-.private-role-badge strong {
-  font-size: 30px;
-  font-weight: 900;
-  color: #ff626e;
-  text-shadow: 0 0 12px rgba(255, 98, 110, 0.25);
-}
-
-.app-footer { padding-top: 24px; text-align: center; color: #79859f; font-size: 10px; letter-spacing: .14em; }
-@media (max-width: 420px) { .app-shell { padding-top: 24px; } .game-card { border-radius: 18px; } .private-role-badge { flex-direction: column; gap: 3px; align-items: flex-start; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none!important; transition: none!important; } }
-
-
-/* ===================================
-   人狼ゲーム UI最終調整
-=================================== */
-
-/* 画面全体 */
 .app-shell {
   width: min(100% - 32px, 520px);
   margin: 0 auto;
+  padding: 42px 0 28px;
 }
-
-/* メインカード */
+.app-header { text-align: center; padding-bottom: 24px; }
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  color: #ffe7b4;
+  background: #ffffff0a;
+  border: 1px solid #ffffff1c;
+  box-shadow: 0 0 38px #e8c48f21;
+  font-size: 44px;
+}
+.eyebrow {
+  margin: 14px 0 6px;
+  font-size: 10px;
+  letter-spacing: .25em;
+  color: #d0b6a6;
+  font-weight: 700;
+}
+h1 {
+  margin: 0;
+  font-size: clamp(29px, 7vw, 42px);
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+.subtitle { color: var(--muted); font-size: 13px; margin-top: 12px; }
 .game-card {
-  background: linear-gradient(
-    145deg,
-    rgba(34, 43, 64, 0.96),
-    rgba(24, 31, 49, 0.98)
-  );
-
+  padding: clamp(20px, 5vw, 34px);
+  background: linear-gradient(145deg, #222b40ed, #181f31f4);
   border: 1px solid #46516c;
   border-radius: 24px;
-
-  box-shadow:
-    0 24px 65px rgba(0, 0, 0, 0.4),
-    inset 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 65px #0006, inset 0 1px #ffffff10;
 }
-
-/* 日付やフェーズ名 */
+.app-footer {
+  padding-top: 24px;
+  text-align: center;
+  color: #79859f;
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+#game { min-height: 220px; text-align: center; }
 #game h2 {
-  font-size: 19px;
-  font-weight: 650;
+  margin: 4px 0 17px;
+  font-size: clamp(22px, 5vw, 27px);
+  line-height: 1.45;
   color: #b4bfd4;
-  margin-bottom: 16px;
 }
-
-/* 今何をすべきかを示す説明 */
+#game h3 { margin-top: 22px; font-size: 17px; }
 #game > p {
-  font-size: 21px;
-  font-weight: 700;
+  color: #aeb8cc;
+  font-size: 16px;
   line-height: 1.7;
-  color: #ffffff;
 }
-
-/* 仲間の人狼の表示 */
-#game .wolf-explanation {
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1.8;
-}
-
-/* 人狼の意見カード */
-.wolf-opinion {
-  background: #402936;
-  border: 1px solid #8e4b5e;
-  border-radius: 12px;
-  padding: 17px;
-  margin: 14px 0;
-}
-
-.wolf-opinion strong {
-  font-size: 20px;
-  color: #ffb0b6;
-}
-
-/* 選択ボタン */
-.choice-button {
-  font-size: 19px;
-  font-weight: 700;
-  padding: 17px 18px;
-}
-
-/* メインボタン */
 button {
+  display: block;
+  width: min(100%, 380px);
+  min-height: 54px;
+  margin: 20px auto 0;
+  padding: 15px 20px;
+  background: linear-gradient(110deg, #b8384e, #e15a63);
+  color: #ffffff;
+  border: 1px solid #ef8190;
+  border-radius: 13px;
+  font: inherit;
   font-size: 18px;
   font-weight: 750;
-  min-height: 54px;
-}
-
-/* 自分の役職 */
-.private-role-badge strong {
-  font-size: 23px;
-  font-weight: 800;
-}
-
-/* 人数選択 */
-.number-field input {
-  font-size: 32px;
-  font-weight: 800;
-}
-
-/* スマホ対応 */
-@media (max-width: 420px) {
-  #game > p {
-    font-size: 19px;
-  }
-
-  #game h2 {
-    font-size: 17px;
-  }
-
-  .game-card {
-    border-radius: 18px;
-  }
-}
-
-
-/* ==============================
-   詳細設定
-============================== */
-
-.advanced-settings {
-  margin: 24px 0;
-  padding: 16px;
-  border: 1px solid #46516c;
-  border-radius: 14px;
-  background: #1d263a;
-  text-align: left;
-}
-
-.advanced-settings summary {
   cursor: pointer;
-  font-size: 19px;
-  font-weight: 700;
-  color: #ffe7b4;
-  padding: 4px;
+  box-shadow: 0 7px 20px #d1405836;
+  transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+  touch-action: manipulation;
 }
-
-.advanced-settings summary::marker {
-  color: #e36a71;
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+  box-shadow: 0 12px 24px #d1405850;
 }
-
-.setting-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  padding: 18px 0;
-  border-bottom: 1px solid #46516c;
-}
-
-.setting-item:last-child {
-  border-bottom: none;
-}
-
-.setting-description {
-  flex: 1;
-  min-width: 0;
-}
-
-.setting-description strong {
-  font-size: 16px;
-  color: #ffffff;
-}
-
-.setting-description p {
-  font-size: 13px;
-  color: #acb6cc;
-  margin: 6px 0 0;
-}
-
-/* ON・OFFスイッチ */
-
-.setting-switch {
-  position: relative;
-  width: 52px;
-  height: 30px;
-  flex-shrink: 0;
-  display: block;
-  cursor: pointer;
-}
-
-.setting-switch input {
-  position: absolute;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  cursor: pointer;
-}
-
-.switch-slider {
-  position: absolute;
-  inset: 0;
-  background: #47536a;
-  border-radius: 30px;
-  transition: background 0.25s;
-  pointer-events: none;
-}
-
-.switch-slider::before {
-  content: "";
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  left: 4px;
-  top: 4px;
-  background: white;
-  border-radius: 50%;
-  transition: transform 0.25s;
-}
-
-.setting-switch input:checked + .switch-slider {
-  background: #e36a71;
-}
-
-.setting-switch input:checked + .switch-slider::before {
-  transform: translateX(22px);
-}
-
-.setting-switch input:focus-visible + .switch-slider {
-  outline: 3px solid #f8c794;
+button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+button:disabled { opacity: .48; cursor: not-allowed; filter: grayscale(.4); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #e34f62;
   outline-offset: 3px;
 }
-
-/* 狂人の人狼確認カード */
-
-.wolf-identity-card {
-  margin: 18px 0;
-  padding: 20px;
-  background: #422c37;
-  border: 1px solid #a65e6a;
-  border-radius: 12px;
-  text-align: center;
+input, select, textarea {
+  max-width: 100%;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: #101728;
+  border: 1px solid #485570;
+  border-radius: 10px;
+  font: inherit;
 }
-
-.wolf-identity-card p {
-  font-size: 14px;
-  color: #f3ccd4;
-  margin: 0 0 10px;
-}
-
-.wolf-identity-card strong {
+input[type="number"] { width: 100px; }
+.field-label {
   display: block;
-  font-size: clamp(22px, 5vw, 28px);
-  color: #ffe7b4;
-  overflow-wrap: anywhere;
-}
-
-
-/* 投票スキップボタン */
-.skip-button {
-  background: #303b57;
-  border: 1px solid #64748b;
-  box-shadow: none;
-  color: #ffffff;
-  margin-top: 12px;
-}
-
-/* キャンセルボタン */
-.cancel-button {
-  background: transparent;
-  border: 1px solid #64748b;
-  box-shadow: none;
-  color: #acb6cc;
-  margin-top: 12px;
-}
-
-
-/* ==========================
-   役職表示の視認性改善
-========================== */
-
-/* 役職の表示枠 */
-#game .private-role-badge {
-  background: rgba(100, 30, 45, 0.12);
-  border: 2px solid #e34f62;
-  border-radius: 16px;
-  padding: 22px 16px;
-  margin-bottom: 26px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-
-  box-shadow: 0 0 18px rgba(227, 79, 98, 0.15);
-}
-
-/* 「あなたの役職」のラベル */
-#game .private-role-badge span {
-  color: #aab0bf;
+  margin: 25px 0 12px;
+  color: #d6dbe8;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 650;
 }
+.error-text { color: #ff9ca4 !important; font-size: 14px; }
 
-/* 役職名：白文字＋赤い輪郭 */
-#game .private-role-badge strong {
+/* ==========================================
+   最初のゲームモード選択画面
+========================================== */
+#game-mode-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px;
+  background: #151923;
+}
+.game-mode-panel {
+  width: 100%;
+  max-width: 420px;
+  padding: 36px 25px;
+  background: #222b3c;
+  border: 1px solid #435069;
+  border-radius: 18px;
+  text-align: center;
+}
+.game-mode-panel h1 { margin: 0 0 12px; color: #fff; font-size: 30px; }
+.game-mode-panel p { margin: 0 0 30px; color: #a8b2c6; font-size: 14px; }
+.game-mode-panel .game-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 58px;
+  margin: 14px 0 0;
+  padding: 14px 18px;
+  border-radius: 10px;
   color: #ffffff;
-  font-size: clamp(30px, 7vw, 38px);
-  font-weight: 900;
-
-  -webkit-text-stroke: 1px #e34f62;
-  paint-order: stroke fill;
-
-  text-shadow: 0 0 16px rgba(227, 79, 98, 0.25);
-  letter-spacing: 0.08em;
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
 }
-
-/* 通常の説明文を薄くする */
-#game > p {
-  color: #8b94a8;
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.7;
-}
-
-/* 人狼の補足説明も控えめにする */
-#game .wolf-explanation {
-  color: #a4adbf !important;
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.7;
-
-  background: rgba(255, 255, 255, 0.025);
-  border-left: 2px solid #6a4652;
+.game-mode-panel .online-mode-btn {
+  background: #355b8c;
+  border: 1px solid #537cad;
   box-shadow: none;
 }
-
-
-/* 端末を渡す相手の名前 */
-#game .pass-player-name {
-  color: #ffffff;
-  font-size: clamp(32px, 8vw, 44px);
-  font-weight: 900;
-  text-align: center;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-
-  text-shadow: 0 0 18px rgba(255, 255, 255, 0.15);
-
-  margin: 20px 0 8px;
+.game-mode-panel .online-mode-btn:hover {
+  background: #426da3;
+  border-color: #7197c5;
 }
-
-/* 端末の受け渡し説明 */
-#game .pass-instruction {
-  color: #8892a6;
-  font-size: 15px;
-  font-weight: 400;
-  text-align: center;
-
-  margin-bottom: 32px;
+.game-mode-panel .single-mode-btn {
+  background: linear-gradient(110deg, #b8384e, #e15a63);
+  border: 1px solid #ef8190;
+  box-shadow: 0 7px 20px #d1405836;
 }
-
-
-/* 占い結果の確認欄 */
-#game .seer-confirm {
-  margin-top: 18px;
-  padding: 20px 16px;
-  background: rgba(110, 40, 58, 0.16);
-  border: 1px solid #9c5264;
-  border-radius: 14px;
-  animation: confirmAppear 0.2s ease-out;
+.game-mode-panel .single-mode-btn:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 12px 24px #d1405850;
 }
-
-#game .seer-confirm h3 {
-  color: #ffffff;
-  font-size: 18px;
-  margin: 0 0 10px;
-}
-
-#game .seer-confirm p {
-  color: #aeb8c8;
-  font-size: 14px;
-  line-height: 1.6;
-  margin: 0 0 16px;
-}
-
-#game .seer-confirm-actions {
-  display: flex;
-  gap: 10px;
-}
-
-#game .seer-confirm-actions button {
-  flex: 1;
-  font-size: 14px;
-  padding: 12px 8px;
+#back-to-game-mode, #back-to-game-mode-online {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-height: 42px;
   margin: 0;
-}
-
-#game .seer-confirm-cancel {
-  background: #343b4e;
+  padding: 10px 14px;
+  background: #374151;
   color: #ffffff;
-  border: 1px solid #626b80;
-}
-
-@keyframes confirmAppear {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-
-/* 人狼の選択ボタン一覧 */
-#game .wolf-button-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 14px 0 26px;
-}
-
-/* 通常の選択ボタン */
-#game .wolf-choice-button {
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  padding: 14px 10px;
-
-  background: #303b57;
-  color: #ffffff;
-  border: 2px solid #48516a;
-  border-radius: 12px;
-
-  font-size: 15px;
+  border: 1px solid #64748b;
+  border-radius: 9px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  text-decoration: none;
+  box-shadow: none;
 }
+#back-to-game-mode:hover, #back-to-game-mode-online:hover { background: #4b5563; }
+#game a[href*="online.html"] { display: none !important; }
 
-/* 選択済みボタン */
-#game .wolf-choice-button.selected {
-  background: #84354b;
-  border-color: #ff829a;
-  color: #ffffff;
-  box-shadow: 0 0 12px rgba(255, 100, 130, 0.2);
+/* ==========================================
+   一台用：人数選択
+========================================== */
+.number-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  margin: 0 auto 12px;
 }
-
-/* スマホの小さい画面 */
-@media (max-width: 380px) {
-  #game .wolf-button-list {
-    grid-template-columns: 1fr;
-  }
+.number-field input {
+  width: 100%;
+  padding: 16px 42px 16px 18px;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
 }
-
-
-/* 人数を変更して遊ぶボタン */
-#game .secondary-button {
-  background: #303b57;
-  color: #ffffff;
-  border: 1px solid #65708b;
-  margin-top: 12px;
-}
-
-#game .secondary-button:hover {
-  background: #3c4969;
-  border-color: #8e9bb8;
-}
-
-
-/* 設定画面の戻るボタン */
-#game .back-button {
-  margin-top: 12px;
-  background: transparent;
-  color: #b4bdcf;
-  border: 1px solid #556078;
-  border-radius: 12px;
-  padding: 13px 18px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-#game .back-button:hover {
-  background: #303b57;
-  color: #ffffff;
-  border-color: #8895b2;
-}
-
-
-/* 人数選択エリア */
+.number-field span { position: absolute; right: 22px; color: var(--muted); pointer-events: none; }
 #game .count-selector {
   display: flex;
   align-items: center;
@@ -591,515 +252,327 @@ button {
   gap: 14px;
   margin: 28px 0;
 }
-
-/* ＋・−ボタン */
 #game .count-adjust {
   width: 64px;
   height: 64px;
   flex-shrink: 0;
-  padding: 0;
   margin: 0;
-
+  padding: 0;
   background: #303b57;
-  color: #ffffff;
   border: 1px solid #65708b;
   border-radius: 14px;
-
+  color: #ffffff;
   font-size: 30px;
   font-weight: 400;
-  cursor: pointer;
+  box-shadow: none;
 }
-
-#game .count-adjust:hover:not(:disabled) {
-  background: #84354b;
-  border-color: #e34f62;
-}
-
-#game .count-adjust:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-/* 中央の数字表示 */
-
+#game .count-adjust:hover:not(:disabled) { background: #84354b; border-color: #e34f62; }
 #game .count-display {
-  width: 110px;
-  height: 64px;
-  flex-shrink: 0;
-
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 5px;
-
+  width: 110px;
+  height: 64px;
+  flex-shrink: 0;
   background: #252b3a;
   border: 1px solid #556078;
   border-radius: 14px;
-  box-sizing: border-box;
 }
-
-
-
 #game .count-display input {
   width: 48px;
   height: 44px;
-  padding: 0;
   margin: 0;
-
+  padding: 0;
   background: transparent;
   color: #ffffff;
-  border: none;
+  border: 0;
   outline: none;
-  box-shadow: none;
-
   text-align: right;
   font-size: 32px;
   font-weight: 800;
-  line-height: 1;
-  box-sizing: border-box;
-
   appearance: textfield;
   -moz-appearance: textfield;
 }
-
-
-/* 数字にカーソルを合わせても標準の上下矢印を出さない */
 #game .count-display input::-webkit-inner-spin-button,
-#game .count-display input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+#game .count-display input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#game .count-display span { color: #aab2c3; font-size: 15px; }
+
+/* ==========================================
+   一台用：プレイヤー・役職設定
+========================================== */
+#name-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 320px;
+  margin: 24px auto;
 }
-
-
-#game .count-display span {
-  display: inline-block;
+.name-input { width: 100%; font-size: 16px; }
+#role-settings { display: flex; flex-direction: column; gap: 11px; margin: 22px 0; }
+#game .role-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 16px;
+  background: #252d40;
+  border: 1px solid #46516a;
+  border-radius: 14px;
+}
+#game .role-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+#game .role-name {
+  color: #ffffff;
+  font-size: 23px;
+  font-weight: 800;
+  text-align: left;
+}
+#game .role-description {
+  margin: 0;
+  color: #b1bbce;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+#game .role-count {
+  flex: 0 0 58px;
+  width: 58px !important;
+  height: 52px;
+  padding: 6px;
+  background: #171d2b;
+  color: #ffffff;
+  border: 1px solid #66718a;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 23px;
+  font-weight: 700;
+}
+.advanced-settings {
+  margin: 24px 0;
+  padding: 16px;
+  background: #1d263a;
+  border: 1px solid #46516c;
+  border-radius: 14px;
+  text-align: left;
+}
+.advanced-settings summary {
+  padding: 4px;
+  color: #ffe7b4;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.advanced-settings summary::marker { color: #e36a71; }
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 18px 0;
+  border-bottom: 1px solid #46516c;
+}
+.setting-item:last-child { border-bottom: none; }
+.setting-description { flex: 1; min-width: 0; }
+.setting-description strong { color: #ffffff; font-size: 16px; }
+.setting-description p { margin: 6px 0 0; color: #acb6cc; font-size: 13px; }
+.setting-switch {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 30px;
   flex-shrink: 0;
-  color: #aab2c3;
+  cursor: pointer;
+}
+.setting-switch input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background: #47536a;
+  border-radius: 30px;
+  transition: background .25s;
+  pointer-events: none;
+}
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform .25s;
+}
+.setting-switch input:checked + .switch-slider { background: #e36a71; }
+.setting-switch input:checked + .switch-slider::before { transform: translateX(22px); }
+.setting-switch input:focus-visible + .switch-slider { outline: 3px solid #f8c794; outline-offset: 3px; }
+
+/* ==========================================
+   一台用：ゲーム画面
+========================================== */
+.role { font-size: 30px; font-weight: 800; }
+.choice-list { display: grid; gap: 10px; margin: 22px 0 6px; }
+.choice-button {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  background: #303b57;
+  border: 1px solid #566785;
+  box-shadow: none;
+  font-size: 18px;
+}
+.choice-button:hover { background: #405073; }
+.survivor-list { margin: 18px 0; text-align: left; }
+.survivor, .eliminated { margin: 8px 0; padding: 12px; border-radius: 9px; }
+.survivor { color: #a9edc6; background: #183d34a8; }
+.eliminated { color: #f5aab4; background: #542b37a8; }
+.wolf-opinion {
+  margin: 14px 0;
+  padding: 17px;
+  background: #402936;
+  border: 1px solid #8e4b5e;
+  border-radius: 12px;
+  text-align: left;
+}
+.wolf-opinion strong { color: #ffb0b6; font-size: 20px; }
+.wolf-opinion p { color: #f2dbe3 !important; margin: 7px 0; }
+.wolf-select, .wolf-comment { width: 100%; margin: 12px 0; }
+.wolf-explanation {
+  padding: 14px;
+  background: #422c37;
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  text-align: left;
+  line-height: 1.8;
+  color: #f2dbe3;
+}
+#game .private-role-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  margin-bottom: 26px;
+  background: rgba(100, 30, 45, .12);
+  border: 2px solid #e34f62;
+  border-radius: 16px;
+  box-shadow: 0 0 18px rgba(227, 79, 98, .15);
+}
+#game .private-role-badge span { color: #aab0bf; font-size: 13px; }
+#game .private-role-badge strong {
+  color: #ffffff;
+  font-size: clamp(30px, 7vw, 38px);
+  font-weight: 900;
+  -webkit-text-stroke: 1px #e34f62;
+  paint-order: stroke fill;
+  text-shadow: 0 0 16px rgba(227, 79, 98, .25);
+}
+#game .pass-player-name {
+  margin: 20px 0 8px;
+  color: #ffffff;
+  font-size: clamp(32px, 8vw, 44px);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+#game .pass-instruction {
+  margin-bottom: 32px;
+  color: #8892a6;
   font-size: 15px;
-  font-weight: 500;
-  line-height: 1;
-  margin: 0;
-  padding: 0;
+  font-weight: 400;
 }
-
-
-
-/* ========================================
-   ゲーム全体のスマホ対応
-======================================== */
-
-/* 画面の横はみ出しを防止 */
-html {
-  width: 100%;
-  overflow-x: clip;
-  -webkit-text-size-adjust: 100%;
+#game .secondary-button,
+#game .back-button,
+#game .skip-button {
+  background: #303b57;
+  color: #ffffff;
+  border: 1px solid #65708b;
+  box-shadow: none;
+  margin-top: 12px;
 }
-
-body {
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0;
-  overflow-x: clip;
-  box-sizing: border-box;
+#game .secondary-button:hover,
+#game .back-button:hover,
+#game .skip-button:hover { background: #3c4969; }
+#game .cancel-button {
+  background: transparent;
+  border: 1px solid #64748b;
+  box-shadow: none;
+  color: #acb6cc;
 }
-
-*, *::before, *::after {
-  box-sizing: border-box;
+#game .special-role-description {
+  margin: 16px 0 24px;
+  padding: 16px;
+  background: #242b3a;
+  border: 1px solid #65708b;
+  border-radius: 12px;
+  text-align: left;
+  line-height: 1.8;
 }
-
-/* ゲームエリア */
-#game {
+#game .wolf-button-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 26px;
+}
+#game .wolf-choice-button {
   width: 100%;
   min-width: 0;
-  max-width: 680px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* 日本語・長い名前の折り返し */
-#game h2,
-#game h3,
-#game p,
-#game strong,
-#game .pass-player-name {
+  margin: 0;
+  padding: 14px 10px;
+  background: #303b57;
+  color: #ffffff;
+  border: 2px solid #48516a;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: none;
   overflow-wrap: anywhere;
-  word-break: normal;
+}
+#game .wolf-choice-button.selected {
+  background: #84354b;
+  border-color: #ff829a;
+  box-shadow: 0 0 12px #ff648233;
+}
+#game .seer-confirm {
+  margin-top: 18px;
+  padding: 20px 16px;
+  background: rgba(110, 40, 58, .16);
+  border: 1px solid #9c5264;
+  border-radius: 14px;
+  animation: confirmAppear .2s ease-out;
+}
+#game .seer-confirm h3 { color: #ffffff; font-size: 18px; }
+#game .seer-confirm p { color: #aeb8c8; font-size: 14px; }
+#game .seer-confirm-actions { display: flex; gap: 10px; }
+#game .seer-confirm-actions button { flex: 1; margin: 0; font-size: 14px; }
+#game .seer-confirm-cancel {
+  background: #343b4e;
+  border: 1px solid #626b80;
+}
+@keyframes confirmAppear {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* 入力欄の共通設定 */
-#game input,
-#game select,
-#game textarea {
-  max-width: 100%;
-}
-
-/* タッチ操作とアクセシビリティ */
-button {
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid #e34f62;
-  outline-offset: 3px;
-}
-
-/* ========================================
-   タブレット・スマホ共通
-======================================== */
-
-@media (max-width: 768px) {
-
-  body {
-    padding-left: 14px;
-    padding-right: 14px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  #game {
-    width: 100%;
-    padding: 20px 16px;
-    border-radius: 18px;
-  }
-
-  #game h2 {
-    font-size: clamp(22px, 5.5vw, 30px);
-    line-height: 1.35;
-  }
-
-  #game h3 {
-    font-size: clamp(17px, 4.4vw, 21px);
-    line-height: 1.4;
-  }
-
-  #game p {
-    font-size: 14px;
-    line-height: 1.75;
-  }
-
-  /* 通常の画面遷移ボタン */
-  #game > button {
-    display: block;
-    width: 100%;
-    min-height: 48px;
-    padding: 13px 14px;
-    font-size: 15px;
-    line-height: 1.5;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  /* プレイヤー名の入力画面 */
-  #game #name-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-  }
-
-  #game .name-input {
-    width: 100%;
-    min-width: 0;
-    min-height: 48px;
-    margin: 0;
-    padding: 12px 14px;
-    font-size: 16px;
-  }
-
-  /* 役職人数の設定 */
-  #game .role-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    width: 100%;
-    min-width: 0;
-  }
-
-  #game .role-row label {
-    flex: 1;
-    min-width: 0;
-    font-size: 15px;
-  }
-
-  #game .role-count {
-    width: 74px;
-    max-width: 38%;
-    min-height: 46px;
-    flex-shrink: 0;
-    margin: 0;
-    font-size: 16px;
-    text-align: center;
-  }
-
-  /* 詳細設定 */
-  #game .advanced-settings {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  #game .setting-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-width: 0;
-  }
-
-  #game .setting-description {
-    flex: 1;
-    min-width: 0;
-  }
-
-  #game .setting-switch {
-    flex-shrink: 0;
-  }
-
-  /* 受け渡し画面 */
-  #game .pass-player-name {
-    font-size: clamp(27px, 7vw, 40px);
-    line-height: 1.35;
-    text-align: center;
-    margin: 20px 0 10px;
-  }
-
-  #game .pass-instruction {
-    font-size: 14px;
-    text-align: center;
-    line-height: 1.6;
-    margin-bottom: 28px;
-  }
-
-  /* 夜の役職表示 */
-  #game .private-role-badge {
-    width: 100%;
-    max-width: 100%;
-    padding: 16px 12px;
-  }
-
-  #game .private-role-badge strong {
-    font-size: clamp(27px, 7vw, 38px);
-    line-height: 1.35;
-    overflow-wrap: anywhere;
-  }
-
-  /* 占い・護衛・投票先の選択 */
-  #game .choice-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    width: 100%;
-  }
-
-  #game .choice-button {
-    width: 100%;
-    min-width: 0;
-    min-height: 52px;
-    margin: 0;
-    padding: 12px 8px;
-    font-size: 14px;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  /* 人狼の襲撃先・理由 */
-  #game .wolf-button-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    width: 100%;
-  }
-
-  #game .wolf-choice-button {
-    width: 100%;
-    min-width: 0;
-    min-height: 52px;
-    margin: 0;
-    padding: 12px 8px;
-    font-size: 14px;
-    line-height: 1.45;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  /* 人狼の仲間の意見 */
-  #game .wolf-opinion {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  /* 生存者一覧 */
-  #game .survivor-list {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  #game .survivor-list p {
-    overflow-wrap: anywhere;
-  }
-
-  /* 占い結果の確認 */
-  #game .seer-confirm {
-    width: 100%;
-    max-width: 100%;
-    padding: 16px 12px;
-  }
-
-  #game .seer-confirm-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  #game .seer-confirm-actions button {
-    flex: 1;
-    min-width: 0;
-    min-height: 46px;
-    padding: 10px 6px;
-    font-size: 13px;
-    white-space: normal;
-  }
-
-  /* 人数設定 */
-  .count-selector {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .count-adjust {
-    width: 58px;
-    height: 60px;
-    flex-shrink: 0;
-    margin: 0;
-    padding: 0;
-    font-size: 27px;
-  }
-
-  .count-display {
-    width: 108px;
-    height: 60px;
-    min-width: 0;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-  }
-
-  .count-display input {
-    width: 48px;
-    height: 44px;
-    min-width: 0;
-    padding: 0;
-    margin: 0;
-    font-size: 29px;
-    text-align: right;
-    line-height: 1;
-    appearance: textfield;
-    -moz-appearance: textfield;
-  }
-
-  .count-display span {
-    display: inline-block;
-    flex-shrink: 0;
-    padding: 0;
-    margin: 0;
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  .count-display input::-webkit-inner-spin-button,
-  .count-display input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-}
-
-/* ========================================
-   小さいスマホ向け
-======================================== */
-
-@media (max-width: 380px) {
-
-  body {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  #game {
-    padding: 18px 12px;
-    border-radius: 14px;
-  }
-
-  #game h2 {
-    font-size: 22px;
-  }
-
-  #game .choice-list,
-  #game .wolf-button-list {
-    gap: 8px;
-  }
-
-  #game .choice-button,
-  #game .wolf-choice-button {
-    padding: 12px 6px;
-    font-size: 13px;
-  }
-
-  #game .role-count {
-    width: 65px;
-  }
-
-  .count-selector {
-    gap: 7px;
-  }
-
-  .count-adjust {
-    width: 50px;
-    height: 56px;
-    font-size: 25px;
-  }
-
-  .count-display {
-    width: 94px;
-    height: 56px;
-    gap: 4px;
-  }
-
-  .count-display input {
-    width: 42px;
-    font-size: 27px;
-  }
-}
-
-/* ========================================
-   動きを減らす設定への対応
-======================================== */
-
-@media (prefers-reduced-motion: reduce) {
-  #game button,
-  #game input,
-  #game .wolf-choice-button {
-    transition: none;
-  }
-}
-
-
-/* 昼の議論タイマー */
+/* ==========================================
+   議論タイマー
+========================================== */
 #game .discussion-timer {
-  width: 100%;
   margin: 24px 0;
   padding: 24px 16px;
   background: #242b3a;
@@ -1107,13 +580,7 @@ textarea:focus-visible {
   border-radius: 18px;
   text-align: center;
 }
-
-#game .discussion-timer > p {
-  color: #b0b9cb;
-  font-size: 14px;
-  margin: 0 0 12px;
-}
-
+#game .discussion-timer > p { color: #b0b9cb; font-size: 14px; }
 #game .discussion-timer-display {
   color: #ffffff;
   font-size: clamp(44px, 12vw, 64px);
@@ -1123,423 +590,111 @@ textarea:focus-visible {
   font-variant-numeric: tabular-nums;
   margin-bottom: 20px;
 }
-
-#game .discussion-timer-display.time-up {
-  color: #ff829a;
-}
-
-#game .discussion-add-time {
-  width: 100%;
-  min-height: 48px;
-  margin: 0;
-  padding: 12px;
-  background: #303b57;
-  color: #ffffff;
-  border: 1px solid #65708b;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-#game .discussion-add-time:hover {
-  background: #84354b;
-  border-color: #e34f62;
-}
-
-@media (max-width: 380px) {
-  #game .discussion-timer {
-    padding: 20px 12px;
-  }
-
-  #game .discussion-timer-display {
-    font-size: 42px;
-    letter-spacing: 1px;
-  }
-}
-
-
-/* 占い結果の表示 */
-#game .seer-result-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  margin: 26px 0;
-  text-align: center;
-}
-
-/* 占った相手の名前 */
-#game .seer-result-text span {
-  display: block;
-  color: #ffffff;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-
-/* 判定結果だけ赤色で強調 */
-#game .seer-result-text strong {
-  display: block;
-  color: #ff617b;
-  font-size: clamp(27px, 7vw, 42px);
-  font-weight: 900;
-  line-height: 1.4;
-  text-shadow: 0 0 18px rgba(255, 80, 110, 0.2);
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 380px) {
-  #game .seer-result-text strong {
-    font-size: 27px;
-  }
-}
-
-
-/* 人狼の仲間確認画面 */
-#game .wolf-teammates {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin: 26px 0;
-  text-align: center;
-}
-
-/* 仲間の人狼という説明 */
-#game .wolf-teammates span {
-  color: #b0b9cb;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-/* 仲間のプレイヤー名 */
-#game .wolf-teammates strong {
-  display: block;
-  color: #ff617b;
-  font-size: clamp(28px, 7vw, 42px);
-  font-weight: 900;
-  line-height: 1.5;
-  text-align: center;
-  overflow-wrap: anywhere;
-  text-shadow: 0 0 18px rgba(255, 80, 110, 0.2);
-}
-
-
-/* タイマー操作ボタンを横並びにする */
+#game .discussion-timer-display.time-up { color: #ff829a; }
 #game .discussion-timer-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  width: 100%;
 }
-
-/* 一時停止・再開ボタン */
+#game .discussion-add-time,
 #game .discussion-pause {
   width: 100%;
   min-height: 48px;
   margin: 0;
   padding: 12px 8px;
-  background: #84354b;
-  color: #ffffff;
-  border: 1px solid #e34f62;
-  border-radius: 12px;
   font-size: 15px;
   font-weight: 700;
 }
-
-/* 既存の＋1分ボタンも高さを統一 */
 #game .discussion-add-time {
-  width: 100%;
-  min-height: 48px;
-  margin: 0;
-}
-
-#game .discussion-pause:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-@media (max-width: 380px) {
-  #game .discussion-timer-controls {
-    gap: 8px;
-  }
-
-  #game .discussion-pause,
-  #game .discussion-add-time {
-    font-size: 13px;
-    padding: 10px 6px;
-  }
-}
-
-
-/* 怪盗の役職交換画面 */
-#game .choice-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
-}
-
-#game .choice-button {
-  min-width: 0;
-  min-height: 52px;
-  margin: 0;
-  padding: 13px 10px;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-/* 怪盗の交換しないボタン */
-#game .back-button {
-  min-height: 48px;
   background: #303b57;
-  color: #ffffff;
   border: 1px solid #65708b;
-  border-radius: 12px;
+  box-shadow: none;
+}
+#game .discussion-pause {
+  background: #84354b;
+  border: 1px solid #e34f62;
 }
 
-/* 小さいスマホ */
-@media (max-width: 380px) {
-  #game .choice-list {
-    gap: 8px;
-  }
-
-  #game .choice-button {
-    padding: 12px 7px;
-    font-size: 13px;
-  }
-}
-
-
-#game .special-role-description {
-  width: 100%;
-  margin: 16px 0 24px;
-  padding: 16px;
-  background: #242b3a;
-  color: #ffffff;
-  border: 1px solid #65708b;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.8;
-  text-align: left;
-}
-
-
-/* 怪盗の交換結果 */
-#game .thief-role-result {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  margin: 24px 0;
-  text-align: center;
-}
-
-#game .thief-role-result span {
-  color: #ffffff;
-  font-size: 17px;
-  font-weight: 600;
-}
-
-#game .thief-role-result strong {
-  color: #ff617b;
-  font-size: clamp(32px, 8vw, 46px);
-  font-weight: 900;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-  text-shadow: 0 0 18px rgba(255, 80, 110, 0.25);
-}
-
-
-/* 役職設定の各カード */
-#game .role-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  width: 100%;
-  padding: 16px;
-  margin-bottom: 12px;
-  background: #252d40;
-  border: 1px solid #46516a;
-  border-radius: 14px;
-}
-
-/* 役職名と説明文 */
-#game .role-info {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-/* 役職名を大きく強調 */
-#game .role-name {
-  display: block;
-  color: #ffffff;
-  font-size: 23px;
-  font-weight: 800;
-  line-height: 1.3;
-  text-align: left;
-}
-
-/* 一言説明 */
-#game .role-description {
-  margin: 0;
-  color: #b1bbce;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.5;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-
-/* 人数入力欄 */
-#game .role-count {
-  flex: 0 0 58px;
-  width: 58px;
-  min-width: 0;
-  height: 52px;
-  padding: 6px;
-  text-align: center;
-  font-size: 23px;
-  font-weight: 700;
-  color: #ffffff;
-  background: #171d2b;
-  border: 1px solid #66718a;
-  border-radius: 10px;
-}
-
-/* スマートフォン対応 */
-@media (max-width: 480px) {
-  #game .role-row {
-    padding: 13px 11px;
-    gap: 8px;
-  }
-
-  #game .role-name {
-    font-size: 20px;
-  }
-
-  #game .role-description {
-    font-size: 12px;
-  }
-
-  #game .role-count {
-    flex-basis: 52px;
-    width: 52px;
-    height: 48px;
-    font-size: 21px;
-  }
-}
-
-
-/* 怪盗に役職を盗まれたときの通知 */
+/* ==========================================
+   役職能力と結果
+========================================== */
+#game .seer-result-text,
+#game .wolf-teammates,
+#game .thief-role-result,
 #game .robbery-notice {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  margin: 26px 0;
   text-align: center;
-  margin: 28px 0;
 }
-
-#game .robbery-notice > strong:first-child {
+#game .seer-result-text span,
+#game .wolf-teammates span,
+#game .thief-role-result span { color: #b0b9cb; font-size: 16px; }
+#game .seer-result-text strong,
+#game .wolf-teammates strong,
+#game .thief-role-result strong,
+#game .robbery-new-role {
   color: #ff617b;
-  font-size: clamp(24px, 6vw, 32px);
+  font-size: clamp(28px, 7vw, 42px);
   font-weight: 900;
-  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 18px #ff506e33;
 }
-
-#game .robbery-notice span {
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-#game .robbery-notice .robbery-new-role {
-  color: #ff617b;
-  font-size: clamp(34px, 9vw, 48px);
-  font-weight: 900;
-  line-height: 1.3;
-}
-
-
-/* ランダム事件カード */
-#game .event-card {
-  padding: 18px;
+#game .wolf-identity-card,
+#game .madman-wolf-card {
   margin: 18px 0;
+  padding: 20px;
+  background: #422c37;
+  border: 1px solid #a65e6a;
+  border-radius: 12px;
+  text-align: center;
+}
+#game .wolf-identity-card strong,
+#game .madman-wolf-names {
+  display: block;
+  color: #ffe7b4;
+  font-size: 24px;
+  font-weight: 800;
+}
+#game .event-card {
+  margin: 18px 0;
+  padding: 18px;
+  background: #372b2b;
   border: 1px solid #d08c59;
   border-radius: 14px;
-  background: #372b2b;
   text-align: center;
 }
+#game .event-card strong { color: #ffd39b; font-size: 20px; }
+#game .event-card p { color: #ffffff; font-size: 15px; }
 
-#game .event-card strong {
-  color: #ffd39b;
-  font-size: 20px;
-}
-
-#game .event-card p {
-  color: #ffffff;
-  font-size: 15px;
-}
-
-/* 勝利演出 */
+/* ==========================================
+   勝利画面・振り返り
+========================================== */
 #game .victory-screen {
+  margin-bottom: 22px;
   padding: 32px 18px;
   border-radius: 20px;
-  margin-bottom: 22px;
   text-align: center;
-  animation: victory-appear 0.7s ease-out both;
+  animation: victoryAppear .7s ease-out both;
 }
-
-#game .victory-wolf {
-  background: linear-gradient(145deg, #451a30, #221924);
-  border: 2px solid #e34f62;
-}
-
-#game .victory-village {
-  background: linear-gradient(145deg, #193d46, #182a34);
-  border: 2px solid #66c8d5;
-}
-
-#game .victory-teruteru {
-  background: linear-gradient(145deg, #504024, #262338);
-  border: 2px solid #ffd27e;
-}
-
-#game .victory-symbol {
-  color: #ffffff;
-  font-size: 76px;
-  animation: victory-glow 2s ease-in-out infinite alternate;
-}
-
+#game .victory-wolf { background: linear-gradient(145deg, #451a30, #221924); border: 2px solid #e34f62; }
+#game .victory-village { background: linear-gradient(145deg, #193d46, #182a34); border: 2px solid #66c8d5; }
+#game .victory-teruteru { background: linear-gradient(145deg, #504024, #262338); border: 2px solid #ffd27e; }
+#game .victory-symbol { color: #ffffff; font-size: 76px; }
 #game .victory-result {
   color: #ffffff;
   font-size: clamp(25px, 7vw, 38px);
   font-weight: 900;
 }
-
-#game .victory-wolf .victory-result {
-  color: #ff829a;
+#game .victory-wolf .victory-result { color: #ff829a; }
+#game .victory-village .victory-result { color: #8be4ed; }
+#game .victory-teruteru .victory-result { color: #ffe09a; }
+@keyframes victoryAppear {
+  from { opacity: 0; transform: scale(.92) translateY(15px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
-
-#game .victory-village .victory-result {
-  color: #8be4ed;
-}
-
-#game .victory-teruteru .victory-result {
-  color: #ffe09a;
-}
-
-/* 振り返り */
 #game .review-panel {
   margin: 20px 0;
   padding: 18px 14px;
@@ -1547,761 +702,214 @@ textarea:focus-visible {
   border: 1px solid #46516a;
   border-radius: 16px;
 }
-
-#game .review-panel[hidden] {
-  display: none !important;
-}
-
-#game .review-panel h3 {
-  color: #ffffff;
-  font-size: 21px;
-  margin: 22px 0 14px;
-}
-
+#game .review-panel h3 { color: #ffffff; font-size: 21px; }
 #game .review-player {
-  padding: 14px;
   margin: 10px 0;
+  padding: 14px;
   background: #252d40;
   border: 1px solid #46516a;
   border-radius: 12px;
 }
-
-#game .review-player strong {
-  color: #ffffff;
-  font-size: 19px;
-}
-
-#game .review-player p,
-#game .review-history-item {
+#game .review-player strong { color: #ffffff; font-size: 19px; }
+#game .review-player p, #game .review-history-item {
   color: #c6cfdd;
   font-size: 14px;
   line-height: 1.6;
 }
-
 #game .review-history-item {
-  padding: 12px;
   margin: 8px 0;
-  border-left: 3px solid #a45a6d;
+  padding: 12px;
   background: #252d40;
+  border-left: 3px solid #a45a6d;
   border-radius: 6px;
 }
-
-#game .review-missing {
-  color: #ffd39b;
-  font-size: 17px;
-  font-weight: 800;
-  text-align: center;
-  padding: 14px;
-}
-
-#game .review-button {
-  background: #84354b;
-  color: #ffffff;
-  border: 1px solid #e34f62;
-}
-
-@keyframes victory-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.92) translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes victory-glow {
-  from {
-    opacity: 0.6;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-}
-
-@media (max-width: 480px) {
-  #game .victory-screen {
-    padding: 26px 12px;
-  }
-
-  #game .victory-symbol {
-    font-size: 60px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #game .victory-screen,
-  #game .victory-symbol {
-    animation: none;
-  }
-}
-
-
-/* =====================================
-   振り返り：役職を大きく赤く表示
-===================================== */
-
-#game .review-role-row {
+#game .review-role-row,
+#game .review-vote-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 12px;
   padding: 12px;
   background: #1a2232;
   border-radius: 10px;
-  text-align: left;
 }
-
-#game .review-role-row span {
-  color: #b1bbce;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-#game .review-role-row .review-role-name {
-  color: #ff617b !important;
-  font-size: clamp(24px, 6vw, 30px) !important;
-  font-weight: 900;
-  line-height: 1.3;
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-/* =====================================
-   振り返り：投票履歴
-===================================== */
-
-#game .review-vote-heading {
-  display: block;
-  color: #ffffff;
-  font-size: 18px;
-  margin-bottom: 14px;
-  text-align: left;
-}
-
-#game .review-vote-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 12px 4px;
-  border-bottom: 1px solid #46516a;
-  text-align: left;
-  font-size: 15px;
-}
-
-#game .review-vote-line:last-child {
-  border-bottom: none;
-}
-
-#game .review-vote-line span:first-child {
-  color: #c6cfdd;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-#game .review-vote-arrow {
-  color: #aab2c3;
-  flex-shrink: 0;
-}
-
+#game .review-role-row span { color: #b1bbce; font-size: 14px; }
+#game .review-role-name,
 #game .review-vote-target {
   color: #ff617b !important;
-  font-size: clamp(17px, 4.5vw, 21px);
+  font-size: clamp(20px, 5vw, 30px);
   font-weight: 900;
-  text-align: right;
-  min-width: 0;
-  overflow-wrap: anywhere;
+}
+#game .review-vote-heading { color: #ffffff; font-size: 18px; }
+#game .review-vote-arrow { color: #aab2c3; }
+#game .review-missing { color: #ffd39b; font-size: 17px; font-weight: 800; }
+#game .review-button {
+  background: #84354b;
+  border: 1px solid #e34f62;
 }
 
-/* =====================================
-   狂人：人狼の名前を強調
-===================================== */
-
-#game .madman-wolf-card {
-  width: 100%;
-  padding: 22px 14px;
-  margin: 20px 0;
-  background: #392332;
-  border: 2px solid #e34f62;
-  border-radius: 16px;
-  box-shadow: 0 0 20px rgba(227, 79, 98, 0.18);
-  text-align: center;
-}
-
-#game .madman-wolf-card p {
-  color: #f3ccd4;
-  font-size: 15px;
-  margin: 0 0 16px;
-}
-
-#game .madman-wolf-names {
-  display: block;
-  color: #ff617b !important;
-  font-size: clamp(29px, 7vw, 39px) !important;
-  font-weight: 900;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-  text-shadow: 0 0 15px rgba(255, 80, 110, 0.25);
-}
-
-
-/* 村人陣営：白色 */
-#game .review-role-row .review-team-village {
-  color: #ffffff !important;
-}
-
-/* 人狼陣営：赤色 */
-#game .review-role-row .review-team-wolf {
-  color: #ff617b !important;
-}
-
-/* 第三陣営：黄色 */
-#game .review-role-row .review-team-third {
-  color: #ffd166 !important;
-}
-
-.online-mode-link {
-  display: block;
-  width: min(100%, 380px);
-  margin: 16px auto;
-  padding: 16px;
-  text-align: center;
-  color: #ffffff;
-  background: #2f45b5;
-  border: 1px solid #320895;
-  border-radius: 13px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-
-/* オンライン人狼の画面 */
-
+/* ==========================================
+   オンラインゲーム共通
+========================================== */
 #online-game {
   width: 100%;
+  min-height: 220px;
   text-align: center;
 }
-
-#online-game [hidden] {
-  display: none !important;
-}
-
-#online-game input {
-  display: block;
-  width: 100%;
-  max-width: 380px;
-  margin: 12px auto;
-  font-size: 18px;
-}
-
-#online-game .field-label {
-  display: block;
-  margin-top: 22px;
-  text-align: left;
-}
-
-#online-game #room-code {
-  font-size: 28px;
-  text-align: center;
-  letter-spacing: 0.15em;
-  font-weight: 800;
-}
-
+#online-game input { max-width: 100%; }
+#online-game .field-label { text-align: left; }
+#online-game button { max-width: 380px; }
+#online-game #room-code { text-align: center; letter-spacing: .15em; font-size: 22px; }
 #display-room-code {
-  padding: 20px 10px;
-  margin: 18px 0;
-  color: #ff829a;
-  background: #222b40;
-  border: 2px solid #e34f62;
-  border-radius: 14px;
-  font-size: clamp(32px, 9vw, 48px);
-  letter-spacing: 0.12em;
-  font-weight: 900;
+  display: inline-block;
+  margin: 12px 0;
+  padding: 10px 20px;
+  background: #101728;
+  color: #ffe7b4;
+  border: 1px solid #556078;
+  border-radius: 12px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: .12em;
 }
-
 #online-members {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin: 18px 0;
+  margin: 20px 0;
 }
-
 .online-member {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 15px;
+  padding: 14px 16px;
   background: #252d40;
   border: 1px solid #46516a;
   border-radius: 12px;
   text-align: left;
 }
-
-.online-member strong {
-  color: #ffffff;
-  font-size: 19px;
-  overflow-wrap: anywhere;
-}
-
-.online-member span {
-  color: #ff9dad;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
+.online-member strong { color: #ffffff; font-size: 16px; overflow-wrap: anywhere; }
+.online-member span { color: #acb6cc; font-size: 12px; }
 #online-status {
-  color: #ffd39b;
-  font-size: 14px;
-  line-height: 1.6;
+  margin-top: 18px;
+  color: #bfc9dc;
+  line-height: 1.7;
   overflow-wrap: anywhere;
 }
-
-#lobby-notice {
-  color: #b0b9cb;
-  font-size: 14px;
-  margin-top: 20px;
-}
-
-
-/* オンライン版から1台モードへ戻るボタン */
-.online-back-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: min(100%, 380px);
-  min-height: 52px;
-  margin: 20px auto 0;
-  padding: 14px 20px;
-
+#lobby-notice { color: #acb6cc; font-size: 14px; line-height: 1.7; }
+.online-back-button,
+#online-game .online-back-menu {
   background: #303b57;
   color: #ffffff;
-
   border: 1px solid #65708b;
-  border-radius: 13px;
-
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: normal;
-  text-decoration: none;
-
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.online-back-button:hover {
-  background: #3c4969;
-  border-color: #a3aec6;
-  transform: translateY(-2px);
-}
-
-.online-back-button:active {
-  transform: scale(0.98);
-}
-
-.online-back-button:focus-visible {
-  outline: 3px solid #f8c794;
-  outline-offset: 3px;
-}
-
-
-/* =================================
-   オンライン人狼：役職設定と確認
-================================= */
-
-#online-role-settings {
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid #46516a;
-}
-
-#online-role-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 20px 0;
-}
-
-.online-role-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 15px;
-  background: #101728;
-  border: 1px solid #46516a;
-  border-radius: 12px;
-}
-
-.online-role-row label {
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-#online-game .online-role-count {
-  width: 75px;
-  margin: 0;
-  text-align: center;
-  font-size: 18px;
-}
-
-.online-check-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin: 18px 0;
-  color: #ffffff;
-  font-size: 15px;
-}
-
-#online-game .online-check-label input {
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  accent-color: #e34f62;
-}
-
-#online-villager-count {
-  color: #ffd166;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-#online-role-error {
-  color: #ff9ca4;
+  box-shadow: none;
   font-size: 14px;
 }
-
-#online-role-reveal {
-  margin-top: 20px;
-  text-align: center;
-}
-
-#online-role-reveal h3 {
+.online-back-button:hover,
+#online-game .online-back-menu:hover { background: #3e4a68; }
+.online-secondary-button,
+#online-game .online-secondary-button {
+  background: #303b57;
+  border: 1px solid #65708b;
   color: #ffffff;
-  font-size: 22px;
+  box-shadow: none;
 }
-
-.online-role-card {
-  padding: 28px 16px;
-  margin: 20px 0;
-  background: #392332;
-  border: 2px solid #e34f62;
-  border-radius: 16px;
-  box-shadow: 0 0 22px rgba(227, 79, 98, .15);
-}
-
-#online-my-role {
-  display: block;
-  color: #ffffff;
-  font-size: clamp(32px, 8vw, 42px);
-  font-weight: 900;
-}
-
-#online-my-role-description {
-  margin-top: 14px;
-  color: #f3ccd4;
-  font-size: 15px;
-  line-height: 1.7;
-}
-
-#online-ready-count {
-  margin-top: 28px;
-}
-
-.online-wait-message {
-  color: #aab2c3;
-  font-size: 14px;
-}
-
-#online-game [hidden] {
-  display: none !important;
-}
-
-
-/* ========================================
-   オンライン人狼：設定の共有表示
-======================================== */
-
+.online-secondary-button:hover { background: #3e4a68; }
+#online-role-settings,
 #online-guest-settings {
-  margin-top: 26px;
-  padding-top: 18px;
-  border-top: 1px solid #46516a;
+  margin-top: 24px;
+  text-align: left;
 }
-
+#online-role-list,
 #online-guest-role-list,
 #online-guest-extras {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  margin: 16px 0 22px;
+  gap: 10px;
+  margin: 16px 0;
 }
-
+.online-role-row,
 .online-readonly-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-
-  padding: 14px;
-  background: #182133;
+  gap: 12px;
+  padding: 13px 15px;
+  background: #252d40;
   border: 1px solid #46516a;
-  border-radius: 11px;
-
-  text-align: left;
+  border-radius: 12px;
 }
-
-.online-readonly-row strong {
-  color: #ffffff;
-  font-size: 14px;
+.online-role-row label,
+.online-readonly-row strong { color: #ffffff; font-size: 15px; }
+.online-readonly-row span { color: #d5ddec; font-size: 14px; }
+#online-game .online-role-count {
+  width: 75px;
+  min-height: 44px;
+  text-align: center;
+  font-size: 18px;
   font-weight: 700;
 }
-
-.online-readonly-row span {
-  color: #ffd166;
-  font-size: 16px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-#online-guest-villagers {
-  color: #ffd166;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.online-settings-help {
-  color: #acb6cc;
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-/* 詳細設定 */
-.online-extra-settings {
-  display: flex;
-  flex-direction: column;
-  margin: 18px 0;
-  padding: 0 14px;
-
-  background: #182133;
-  border: 1px solid #46516a;
-  border-radius: 14px;
-}
-
+#online-villager-count,
+#online-guest-villagers { color: #ffe7b4; font-size: 17px; font-weight: 700; }
+#online-role-error { color: #ff9ca4; font-size: 14px; line-height: 1.6; }
+.online-settings-help { color: #acb6cc; font-size: 13px; line-height: 1.7; }
+.online-extra-settings { margin: 16px 0; }
 .online-extra-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-
-  padding: 17px 0;
+  gap: 12px;
+  padding: 13px 0;
   border-bottom: 1px solid #46516a;
-
-  text-align: left;
 }
-
-.online-extra-row:last-child {
-  border-bottom: none;
+.online-extra-row strong { color: #ffffff; font-size: 15px; }
+.online-extra-row small { color: #acb6cc; }
+.online-readonly-row .online-setting-on { color: #a9edc6; }
+.online-readonly-row .online-setting-off { color: #f5aab4; }
+.online-check-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c6cfdd;
 }
-
-.online-extra-row > span {
-  flex: 1;
-  min-width: 0;
-}
-
-.online-extra-row strong {
-  display: block;
-  color: #ffffff;
-  font-size: 14px;
-}
-
-.online-extra-row small {
-  display: block;
-  margin-top: 6px;
-  color: #aab2c3;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-#online-game .online-extra-row input {
-  width: 21px;
-  height: 21px;
-  margin: 0;
-  flex-shrink: 0;
-  accent-color: #e34f62;
-}
-
-.online-readonly-row .online-setting-on {
-  color: #90e3b3;
-}
-
-.online-readonly-row .online-setting-off {
-  color: #aab2c3;
-}
-
-#online-game [hidden] {
-  display: none !important;
-}
-
-
-/* ========================================
-   オンライン：折りたたみ式詳細設定
-======================================== */
-
+#online-game .online-check-label input { width: auto; }
 #online-game .online-advanced-settings {
-  margin: 24px 0;
+  margin: 22px 0;
   padding: 16px;
   background: #1d263a;
   border: 1px solid #46516c;
   border-radius: 14px;
+  text-align: left;
 }
-
 #online-game .online-advanced-settings summary {
   color: #ffe7b4;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   cursor: pointer;
-  padding: 4px;
 }
+#online-game .online-advanced-settings .setting-item { border-color: #46516c; }
 
-#online-game .online-extra-settings {
-  display: flex;
-  flex-direction: column;
-  margin: 16px 0 0;
-  padding: 0;
-  background: transparent;
-  border: none;
-}
-
-/* 各設定の配置 */
-#online-game .online-advanced-settings .setting-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  padding: 17px 0;
-  border-bottom: 1px solid #46516c;
-}
-
-#online-game .online-advanced-settings .setting-item:last-child {
-  border-bottom: none;
-}
-
-#online-game .online-advanced-settings .setting-description {
-  flex: 1;
-  min-width: 0;
-}
-
-#online-game .online-advanced-settings .setting-description strong {
-  color: #ffffff;
-  font-size: 15px;
-}
-
-#online-game .online-advanced-settings .setting-description p {
-  margin: 6px 0 0;
-  color: #acb6cc;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-/* スライドスイッチ */
-#online-game .online-advanced-settings .setting-switch {
-  position: relative;
-  display: block;
-  flex-shrink: 0;
-  width: 52px;
-  height: 30px;
-  cursor: pointer;
-}
-
-#online-game .online-advanced-settings .setting-switch input {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-#online-game .online-advanced-settings .switch-slider {
-  position: absolute;
-  inset: 0;
-  background: #47536a;
-  border-radius: 30px;
-  pointer-events: none;
-  transition: background 0.25s ease;
-}
-
-#online-game .online-advanced-settings .switch-slider::before {
-  content: "";
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 22px;
-  height: 22px;
-  background: #ffffff;
-  border-radius: 50%;
-  transition: transform 0.25s ease;
-}
-
-/* ON状態 */
-#online-game .online-advanced-settings
-.setting-switch input:checked + .switch-slider {
-  background: #e36a71;
-}
-
-#online-game .online-advanced-settings
-.setting-switch input:checked + .switch-slider::before {
-  transform: translateX(22px);
-}
-
-/* キーボード操作時 */
-#online-game .online-advanced-settings
-.setting-switch input:focus-visible + .switch-slider {
-  outline: 3px solid #f8c794;
-  outline-offset: 3px;
-}
-
-
-/* ========================================
-   オンラインルーム選択画面
-======================================== */
-
-#online-game #entry-screen {
-  text-align: center;
-}
-
+/* ==========================================
+   オンライン：ルーム選択
+========================================== */
+#online-game #entry-screen { text-align: center; }
 #online-game .online-menu-description {
+  margin-bottom: 28px;
   color: #acb6cc;
   font-size: 14px;
-  margin-bottom: 28px;
   line-height: 1.7;
 }
-
 #online-game #online-create-screen,
-#online-game #online-join-screen {
-  text-align: center;
-}
-
+#online-game #online-join-screen { text-align: center; }
 #online-game #online-create-screen input,
 #online-game #online-join-screen input {
   display: block;
   width: min(100%, 380px);
   margin: 0 auto;
   font-size: 16px;
-  text-align: left;
 }
-
 #online-game #online-create-screen .field-label,
 #online-game #online-join-screen .field-label {
   width: min(100%, 380px);
@@ -2310,51 +918,42 @@ textarea:focus-visible {
   text-align: left;
 }
 
-/* ルーム参加（サブボタン） */
-#online-game .online-secondary-button {
-  background: #303b57;
-  border: 1px solid #65708b;
-  box-shadow: none;
-  color: #ffffff;
-}
-
-#online-game .online-secondary-button:hover {
-  background: #3e4a68;
-  border-color: #92a0bd;
-}
-
-/* 一つ前の画面に戻る */
-#online-game .online-back-menu {
-  margin-top: 14px;
-  background: transparent;
-  border: 1px solid #556078;
-  box-shadow: none;
-  color: #b4bdcf;
-  font-size: 14px;
-  font-weight: 500;
-  min-height: 48px;
-}
-
-#online-game .online-back-menu:hover {
-  background: #303b57;
-  color: #ffffff;
-  border-color: #8895b2;
-}
-
-/* hidden属性を確実に反映 */
-#online-game [hidden] {
-  display: none !important;
-}
-
-
-/* ========================================
-   オンライン人狼：初夜
-======================================== */
-
-#online-night-screen {
+/* ==========================================
+   オンライン：役職確認
+========================================== */
+#online-role-reveal {
+  padding: 18px 0;
   text-align: center;
 }
+#online-role-reveal h3 { color: #ffffff; font-size: 22px; }
+.online-role-card {
+  margin: 22px 0;
+  padding: 24px 16px;
+  background: rgba(100, 30, 45, .16);
+  border: 2px solid #e34f62;
+  border-radius: 16px;
+  text-align: center;
+}
+#online-my-role {
+  display: block;
+  margin: 14px 0;
+  color: #ffffff;
+  font-size: clamp(30px, 8vw, 42px);
+  font-weight: 900;
+  text-shadow: 0 0 16px #e34f6240;
+}
+#online-my-role-description {
+  color: #bfc9dc;
+  font-size: 15px;
+  line-height: 1.8;
+}
+#online-ready-count { color: #ffe7b4; font-size: 16px; font-weight: 700; }
+.online-wait-message { color: #acb6cc; font-size: 14px; line-height: 1.7; }
 
+/* ==========================================
+   オンライン：初夜
+========================================== */
+#online-night-screen { text-align: center; }
 #online-night-role {
   margin: 20px 0;
   padding: 15px;
@@ -2365,201 +964,56 @@ textarea:focus-visible {
   font-size: 20px;
   font-weight: 700;
 }
-
-#online-night-message {
-  color: #ffffff;
-  line-height: 1.8;
-}
-
-#online-night-action-area {
-  margin: 24px 0;
-}
-
+#online-night-message { color: #ffffff; line-height: 1.8; }
+#online-night-action-area { margin: 24px 0; }
 #online-night-target {
   display: block;
   width: 100%;
-  padding: 14px;
   margin: 12px 0 18px;
-  border: 1px solid #65708b;
-  border-radius: 10px;
+  padding: 14px;
   background: #182133;
   color: #ffffff;
+  border: 1px solid #65708b;
+  border-radius: 10px;
   font-size: 16px;
 }
+#online-night-result { color: #90e3b3; font-weight: 600; line-height: 1.7; }
+#online-go-night { margin-top: 18px; }
 
-#online-night-result {
-  color: #90e3b3;
-  font-weight: 600;
-  line-height: 1.7;
-}
-
-#online-go-night {
-  margin-top: 18px;
-}
-
-#online-game [hidden] {
-  display: none !important;
-}
-
-
-/* ========================================
-   ゲームモード選択画面
-======================================== */
-
-#game-mode-screen {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 20px;
-
-  background: #151923;
-}
-
-#game-mode-screen[hidden] {
-  display: none !important;
-}
-
-.game-mode-panel {
-  width: 100%;
-  max-width: 420px;
-
-  padding: 36px 25px;
-  background: #222b3c;
-  border: 1px solid #435069;
-  border-radius: 18px;
-
-  text-align: center;
-}
-
-.game-mode-panel h1 {
-  margin-bottom: 12px;
-  color: #fff;
-  font-size: 30px;
-}
-
-.game-mode-panel p {
-  margin-bottom: 30px;
-  color: #a8b2c6;
-  font-size: 14px;
-}
-
-.game-mode-btn {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  width: 100%;
-  min-height: 58px;
-  margin-top: 14px;
-  padding: 14px 18px;
-
-  border: 0;
-  border-radius: 10px;
-
-  color: #fff;
-  font-size: 17px;
-  font-weight: bold;
-  text-decoration: none;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.online-mode-btn {
-  background: #a73441;
-}
-
-.online-mode-btn:hover {
-  background: #c34453;
-}
-
-.single-mode-btn {
-  background: #37435d;
-  border: 1px solid #69758e;
-}
-
-.single-mode-btn:hover {
-  background: #485772;
-}
-
-@media (max-width: 480px) {
-  .game-mode-panel {
-    padding: 28px 20px;
+/* ==========================================
+   スマートフォン対応
+========================================== */
+@media (max-width: 768px) {
+  body {
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-
-  .game-mode-panel h1 {
-    font-size: 26px;
-  }
+  .app-shell { width: 100%; padding-top: 24px; }
+  .game-card { padding: 20px 16px; border-radius: 18px; }
+  #game h2 { font-size: clamp(22px, 5.5vw, 30px); }
+  #game h3 { font-size: 18px; }
+  #game p { font-size: 14px; line-height: 1.75; }
+  #game > button { width: 100%; min-height: 48px; padding: 13px 14px; font-size: 15px; }
+  #game .role-row { padding: 13px 11px; gap: 8px; }
+  #game .role-name { font-size: 20px; }
+  #game .role-description { font-size: 12px; }
+  #game .role-count { flex-basis: 52px; width: 52px !important; height: 48px; font-size: 21px; }
+  #game .choice-list,
+  #game .wolf-button-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #game .choice-button,
+  #game .wolf-choice-button { min-width: 0; font-size: 14px; padding: 12px 8px; }
+  #game .count-selector { gap: 10px; }
+  #game .count-adjust { width: 58px; height: 60px; font-size: 27px; }
+  #game .count-display { width: 108px; height: 60px; }
+  #game .count-display input { font-size: 29px; }
+  #online-game button { width: 100%; }
+  #online-game .online-role-count { width: 70px; }
+  #game-mode-screen { padding: 16px; }
 }
-
-
-/* オンラインで遊ぶ：青色 */
-.online-mode-btn {
-  background: #1356e6;
-  color: #ffffff;
-}
-
-.online-mode-btn:hover {
-  background: #0044ff;
-}
-
-/* 一台で遊ぶ：赤色 */
-.single-mode-btn {
-  background: #c70d0d;
-  border: none;
-  color: #ffffff;
-}
-
-.single-mode-btn:hover {
-  background: #c30b0b;
-}
-
-/* ========================================
-   ゲームモード選択に戻るボタン
-======================================== */
-
-#back-to-game-mode,
-#back-to-game-mode-online {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 1000;
-
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-
-  width: auto;
-  min-height: 42px;
-  padding: 10px 14px;
-
-  background: #374151;
-  color: #ffffff;
-  border: 1px solid #64748b;
-  border-radius: 9px;
-
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-#back-to-game-mode:hover,
-#back-to-game-mode-online:hover {
-  background: #4b5563;
-}
-
-#back-to-game-mode[hidden] {
-  display: none !important;
-}
-
 @media (max-width: 480px) {
+  .game-mode-panel { padding: 28px 20px; }
+  .game-mode-panel h1 { font-size: 26px; }
   #back-to-game-mode,
   #back-to-game-mode-online {
     top: 10px;
@@ -2567,86 +1021,22 @@ textarea:focus-visible {
     padding: 9px 11px;
     font-size: 12px;
   }
+  .online-member { padding: 12px; }
+  .online-role-row { padding: 12px 10px; }
 }
-
-/* ========================================
-   ゲームモード選択：落ち着いた配色
-======================================== */
-
-/* オンラインで遊ぶ：ネイビーブルー */
-.online-mode-btn {
-  background: #344e70;
-  border: 1px solid #4a6485;
-  color: #ffffff;
-  box-shadow: none;
+@media (max-width: 380px) {
+  body { padding-left: 10px; padding-right: 10px; }
+  .game-card { padding: 18px 12px; }
+  #game .count-selector { gap: 7px; }
+  #game .count-adjust { width: 50px; height: 56px; }
+  #game .count-display { width: 94px; height: 56px; }
+  #game .count-display input { width: 42px; font-size: 27px; }
+  #game .choice-list,
+  #game .wolf-button-list { grid-template-columns: 1fr; }
 }
-
-.online-mode-btn:hover {
-  background: #01285b;
-  border-color: #607da1;
-}
-
-/* 一台で遊ぶ：ワインレッド */
-.single-mode-btn {
-  background: #793c49;
-  border: 1px solid #955363;
-  color: #ffffff;
-  box-shadow: none;
-}
-
-.single-mode-btn:hover {
-  background: #914b5b;
-  border-color: #ad6878;
-}
-
-
-/* ========================================
-   ゲームモード選択のボタンを既存画面に統一
-======================================== */
-
-/* オンラインで遊ぶ：既存の紺色ボタン */
-.game-mode-panel .online-mode-btn {
-  background: #303b57;
-  color: #ffffff;
-  border: 1px solid #65708b;
-  box-shadow: none;
-}
-
-.game-mode-panel .online-mode-btn:hover {
-  background: #3c4969;
-  border-color: #8e9bb8;
-}
-
-/* 一台で遊ぶ：既存の「次へ進む」ボタン */
-.game-mode-panel .single-mode-btn {
-  background: linear-gradient(110deg, #b8384e, #e15a63);
-  color: #ffffff;
-  border: 1px solid #ef8190;
-  box-shadow: 0 7px 20px #d1405836;
-}
-
-.game-mode-panel .single-mode-btn:hover {
-  background: linear-gradient(110deg, #b8384e, #e15a63);
-  filter: brightness(1.12);
-  box-shadow: 0 12px 24px #d1405850;
-}
-
-
-/* 一台用ゲーム内のオンライン移動リンクを非表示 */
-#game a[href*="online.html"] {
-  display: none !important;
-}
-
-
-/* オンラインで遊ぶ：落ち着いた青色 */
-.game-mode-panel .online-mode-btn {
-  background: #355b8c;
-  color: #ffffff;
-  border: 1px solid #537cad;
-  box-shadow: none;
-}
-
-.game-mode-panel .online-mode-btn:hover {
-  background: #426da3;
-  border-color: #7197c5;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

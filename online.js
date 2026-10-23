@@ -154,6 +154,21 @@ function watchMembers(roomCode) {
 
       membersBox.replaceChildren();
 
+const roleMemberList = document.getElementById("online-role-member-list");
+if (roleMemberList) {
+  roleMemberList.replaceChildren();
+  members.forEach(([uid, member]) => {
+    const item = document.createElement("div");
+    item.className = "online-member";
+    const name = document.createElement("strong");
+    name.textContent = member.name;
+    const mark = document.createElement("span");
+    mark.textContent = uid === currentUid ? "あなた" : "参加中";
+    item.append(name, mark);
+    roleMemberList.appendChild(item);
+  });
+}
+
       memberCount.textContent =
         `参加者（${members.length}人）`;
         memberCount.dataset.playerCount =
@@ -196,24 +211,7 @@ mark.textContent =
   
 const roleMemberList = document.getElementById("online-role-member-list");
 
-if (roleMemberList) {
-  roleMemberList.replaceChildren();
 
-  members.forEach(([uid, member]) => {
-    const item = document.createElement("div");
-    item.className = "online-member";
-
-    const name = document.createElement("strong");
-    name.textContent = member.name;
-
-    const mark = document.createElement("span");
-    mark.textContent =
-      uid === currentUid ? "あなた" : "参加中";
-
-    item.append(name, mark);
-    roleMemberList.appendChild(item);
-  });
-}
 
 }
 

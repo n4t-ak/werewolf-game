@@ -11,6 +11,12 @@
 
 </head>
 <body>
+
+
+<script type="module" src="./online.js?v=20261024-1"></script>
+
+
+
   <main class="app-shell">
     <header class="app-header">
       <h1>オンライン人狼</h1>
@@ -258,6 +264,29 @@
     現在は初夜の結果判定を実装していないため、
     襲撃結果や占い結果はまだ表示されません。
   </p>
+  
+<button id="online-start-discussion" type="button" hidden>
+  昼の議論を開始する
+</button>
+
+</div>
+
+<!-- 昼の議論画面 -->
+<div id="online-discussion-screen" hidden>
+  <h2>昼の議論</h2>
+  <p>生存者同士で話し合いましょう。</p>
+ 
+<div id="online-discussion-timer">03:00</div>
+<div id="online-discussion-controls" hidden>
+  <button id="online-add-minute" type="button">＋1分</button>
+  <button id="online-pause-discussion" type="button">一時停止</button>
+</div>
+
+  <p id="online-discussion-message">
+    議論中です。
+  </p>
+  <h3>参加者</h3>
+  <div id="online-discussion-members"></div>
 </div>
 
         <!-- ステータス表示 -->
@@ -276,8 +305,6 @@
 
 
   <!-- Firebase・オンラインゲーム処理 -->
-
-<script type="module" src="./online.js?v=20261023-5"></script>
 
 
 

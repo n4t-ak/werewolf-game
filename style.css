@@ -1134,3 +1134,62 @@ input[type="number"] { width: 100px; }
   color: #acb6cc;
   line-height: 1.8;
 }
+
+#online-discussion-screen {
+  padding: 18px 0;
+  text-align: center;
+}
+#online-discussion-screen h2 {
+  color: #ffe7b4;
+  font-size: 28px;
+}
+#online-discussion-timer {
+  margin: 28px 0 16px;
+  padding: 22px 10px;
+  background: #242b3a;
+  border: 1px solid #65708b;
+  border-radius: 16px;
+  color: #ffffff;
+  font-size: clamp(48px, 12vw, 68px);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+#online-discussion-message {
+  color: #ffe7b4;
+  font-weight: 700;
+}
+#online-discussion-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+#online-discussion-controls {
+  display: flex;
+  gap: 10px;
+  margin: 18px 0;
+}
+#online-discussion-controls button {
+  flex: 1;
+  width: 50%;
+  min-width: 0;
+  min-height: 50px;
+  margin: 0;
+  padding: 12px 8px;
+  font-size: 15px;
+}
+#online-add-minute {
+  background: #303b57;
+  border-color: #65708b;
+}
+#online-pause-discussion {
+  background: #84354b;
+  border-color: #e34f62;
+}
+@media (max-width: 380px) {
+  #online-discussion-controls button {
+    font-size: 13px;
+    padding: 10px 5px;
+  }
+}

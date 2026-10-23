@@ -5,8 +5,12 @@ import {
   set,
   onValue,
   get,
-  onDisconnect
+  onDisconnect,
+  serverTimestamp,
+  runTransaction
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+
+
 
 
 import {
@@ -846,6 +850,11 @@ if (meta.phase === "day") {
   enterOnlineDay();
 }
 
+if (meta.phase === "discussion") {
+  enterOnlineDiscussion(meta);
+}
+
+
       
     },
     
@@ -1463,6 +1472,11 @@ function enterOnlineDay() {
   roleRevealBox.hidden = true;
   nightScreen.hidden = true;
   dayScreen.hidden = false;
+  
+discussionScreen.hidden = true;
+startDiscussionButton.hidden = !onlineIsHost;
+startDiscussionButton.disabled = false;
+
 
   dayMembersBox.replaceChildren();
   currentMembers.forEach(([uid, member]) => {
@@ -1728,12 +1742,30 @@ nightSubmitButton.addEventListener("click", async () => {
       }
     );
 
-    nightActionSaved = true;
-    updateNightDoneButton();
-    nightActionArea.hidden = true;
 
-    nightResult.textContent =
-      "行動を確定しました。";
+nightActionSaved = true;
+nightActionArea.hidden = true;
+nightResult.textContent = "行動を保存しました。完了処理中…";
+updateNightDoneButton();
+
+try {
+  await set(
+    ref(db, `rooms/${currentRoom}/nightDone/${currentUid}`),
+    true
+  );
+  nightDoneByMe = true;
+  nightDoneButton.hidden = true;
+  nightDoneButton.disabled = true;
+  nightResult.textContent =
+    "夜の行動を確定しました。ほかの参加者を待っています。";
+} catch (doneError) {
+  console.error("夜の完了通知エラー:", doneError);
+  nightResult.textContent =
+    "行動は保存されましたが、完了通知に失敗しました。下の完了ボタンを押してください。";
+  nightDoneButton.hidden = false;
+  nightDoneButton.disabled = false;
+}
+
 
   } catch (error) {
     console.error("初夜の行動保存エラー：", error);
@@ -1742,3 +1774,238 @@ nightSubmitButton.addEventListener("click", async () => {
     nightSubmitButton.disabled = false;
   }
 });
+
+
+const startDiscussionButton = document.getElementById("online-start-discussion");
+const discussionScreen = document.getElementById("online-discussion-screen");
+const discussionTimer = document.getElementById("online-discussion-timer");
+const discussionMessage = document.getElementById("online-discussion-message");
+const discussionMembers = document.getElementById("online-discussion-members");
+const discussionControlsBox = document.getElementById("online-discussion-controls");
+const addMinuteButton = document.getElementById("online-add-minute");
+const pauseDiscussionButton = document.getElementById("online-pause-discussion");
+
+const DISCUSSION_DURATION = 3 * 60 * 1000;
+let discussionInterval = null;
+let discussionStartedAt = null;
+let discussionControlData = {
+  paused: false,
+  pausedAt: 0,
+  pausedMs: 0,
+  extraMs: 0
+};
+let stopDiscussionControlsListener = null;
+let stopServerOffsetListener = null;
+let serverTimeOffset = 0;
+
+function getDiscussionNow() {
+  return Date.now() + serverTimeOffset;
+}
+
+function renderDiscussionMembers() {
+  discussionMembers.replaceChildren();
+  currentMembers.forEach(([uid, member]) => {
+    const row = document.createElement("div");
+    row.className = "online-member";
+    const name = document.createElement("strong");
+    name.textContent = member.name;
+    const mark = document.createElement("span");
+    mark.textContent =
+      uid === currentHostUid ? "ホスト" :
+      uid === currentUid ? "あなた" : "参加中";
+    row.append(name, mark);
+    discussionMembers.appendChild(row);
+  });
+}
+
+function updateDiscussionTimer() {
+  if (!Number.isFinite(discussionStartedAt) || discussionStartedAt <= 0) {
+    discussionTimer.textContent = "--:--";
+    return;
+  }
+
+  const now = getDiscussionNow();
+  const state = discussionControlData;
+  const referenceNow = state.paused ? state.pausedAt : now;
+  const elapsed = Math.max(
+    0,
+    referenceNow - discussionStartedAt - state.pausedMs
+  );
+  const remaining = Math.max(
+    0,
+    DISCUSSION_DURATION + state.extraMs - elapsed
+  );
+
+  const seconds = Math.ceil(remaining / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const leftover = seconds % 60;
+
+  discussionTimer.textContent =
+    String(minutes).padStart(2, "0") + ":" +
+    String(leftover).padStart(2, "0");
+
+  discussionControlsBox.hidden = !onlineIsHost;
+  pauseDiscussionButton.textContent =
+    state.paused ? "再開する" : "一時停止";
+  pauseDiscussionButton.disabled = remaining === 0 && !state.paused;
+
+  if (state.paused) {
+    discussionMessage.textContent = "議論を一時停止しています。";
+  } else if (remaining === 0) {
+    discussionMessage.textContent = "議論時間が終了しました。";
+  } else {
+    discussionMessage.textContent = "議論中です。";
+  }
+}
+
+function enterOnlineDiscussion(meta) {
+  entryScreen.hidden = true;
+  lobbyScreen.hidden = true;
+  roleRevealBox.hidden = true;
+  nightScreen.hidden = true;
+  dayScreen.hidden = true;
+  discussionScreen.hidden = false;
+
+  renderDiscussionMembers();
+  discussionStartedAt = Number(meta.discussionStartedAt) || null;
+  discussionControlsBox.hidden = !onlineIsHost;
+
+  if (discussionInterval !== null) {
+    clearInterval(discussionInterval);
+  }
+
+  if (stopDiscussionControlsListener) {
+    stopDiscussionControlsListener();
+  }
+
+  stopDiscussionControlsListener = onValue(
+    ref(db, `rooms/${currentRoom}/discussionTimerControls`),
+    snapshot => {
+      discussionControlData = snapshot.val() || {
+        paused: false,
+        pausedAt: 0,
+        pausedMs: 0,
+        extraMs: 0
+      };
+      updateDiscussionTimer();
+    },
+    error => {
+      console.error("タイマー同期エラー:", error);
+      discussionMessage.textContent =
+        "タイマーの同期に失敗しました：" + error.message;
+    }
+  );
+
+  updateDiscussionTimer();
+  discussionInterval = setInterval(updateDiscussionTimer, 1000);
+}
+
+startDiscussionButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "day") return;
+  startDiscussionButton.disabled = true;
+  try {
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/discussionStartedAt`),
+      serverTimestamp()
+    );
+    await set(
+      ref(db, `rooms/${currentRoom}/meta/phase`),
+      "discussion"
+    );
+  } catch (error) {
+    console.error("議論開始エラー:", error);
+    showStatus("議論を開始できません：" + error.message);
+    startDiscussionButton.disabled = false;
+  }
+});
+
+addMinuteButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "discussion") return;
+  addMinuteButton.disabled = true;
+  try {
+    await runTransaction(
+      ref(db, `rooms/${currentRoom}/discussionTimerControls`),
+      current => {
+        const state = current || {
+          paused: false,
+          pausedAt: 0,
+          pausedMs: 0,
+          extraMs: 0
+        };
+        return {
+          ...state,
+          extraMs: state.extraMs + 60000
+        };
+      }
+    );
+  } catch (error) {
+    console.error("時間追加エラー:", error);
+    discussionMessage.textContent =
+      "時間を追加できません：" + error.message;
+  } finally {
+    addMinuteButton.disabled = false;
+  }
+});
+
+pauseDiscussionButton.addEventListener("click", async () => {
+  if (!onlineIsHost || currentPhase !== "discussion") return;
+  pauseDiscussionButton.disabled = true;
+  try {
+    const result = await runTransaction(
+      ref(db, `rooms/${currentRoom}/discussionTimerControls`),
+      current => {
+        const state = current || {
+          paused: false,
+          pausedAt: 0,
+          pausedMs: 0,
+          extraMs: 0
+        };
+        const now = getDiscussionNow();
+
+        if (state.paused) {
+          return {
+            ...state,
+            paused: false,
+            pausedAt: 0,
+            pausedMs: state.pausedMs + Math.max(0, now - state.pausedAt)
+          };
+        }
+
+        return {
+          ...state,
+          paused: true,
+          pausedAt: now
+        };
+      }
+    );
+    if (!result.committed) {
+      throw new Error("タイマーの更新が確定されませんでした。");
+    }
+  } catch (error) {
+    console.error("一時停止エラー:", error);
+    discussionMessage.textContent =
+      "一時停止を切り替えられません：" + error.message;
+  } finally {
+    pauseDiscussionButton.disabled = false;
+  }
+});
+
+stopServerOffsetListener = onValue(
+  ref(db, ".info/serverTimeOffset"),
+  snapshot => {
+    serverTimeOffset = Number(snapshot.val()) || 0;
+  }
+);
+
+window.addEventListener("pagehide", () => {
+  if (discussionInterval !== null) {
+    clearInterval(discussionInterval);
+  }
+  if (stopDiscussionControlsListener) {
+    stopDiscussionControlsListener();
+  }
+  if (stopServerOffsetListener) {
+    stopServerOffsetListener();
+  }
+});
+

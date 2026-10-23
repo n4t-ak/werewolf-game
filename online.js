@@ -1,9 +1,11 @@
 
+
 import {
   ref,
   set,
   onValue,
-  get
+  get,
+  onDisconnect
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
 
 
@@ -15,6 +17,8 @@ import {
 const entryScreen = document.getElementById("entry-screen");
 const lobbyScreen = document.getElementById("lobby-screen");
 const nameInput = document.getElementById("online-name");
+const joinNameInput =
+  document.getElementById("online-join-name");
 const roomInput = document.getElementById("room-code");
 const statusText = document.getElementById("online-status");
 const membersBox = document.getElementById("online-members");
@@ -26,6 +30,11 @@ let currentRoom = null;
 let currentUid = null;
 let stopMembersListener = null;
 let busy = false;
+let stopConnectionListener = null;
+let currentPhase = "lobby";
+let reconnectNeeded = false;
+let connectedOnce = false;
+let reconnecting = false;
 
 function showStatus(message) {
   statusText.textContent = message;
@@ -38,7 +47,9 @@ function setBusy(value) {
 }
 
 function getPlayerName() {
-  const name = nameInput.value.trim();
+  const name = onlineIsHost
+  ? nameInput.value.trim()
+  : joinNameInput.value.trim();
 
   if (!name || name.length > 20) {
     throw new Error("名前を1〜20文字で入力してください。");
@@ -66,17 +77,26 @@ function getMemberPath(roomCode, uid) {
 }
 
 // 自分をルームの参加者として登録する
+
 async function registerMember(roomCode, name, uid) {
   const memberRef = ref(
     db,
     getMemberPath(roomCode, uid)
   );
 
+  // 接続が切れたときに、自分の参加者情報を削除
+  // 登録より先に設定しておく
+  await onDisconnect(memberRef).remove();
+
+  // 参加者を登録
   await set(memberRef, {
     name,
     joinedAt: Date.now()
   });
+
+  console.log("参加者登録完了：", name);
 }
+
 
 // ルームに入った後の画面
 function showLobby(roomCode) {
@@ -99,6 +119,7 @@ function showLobby(roomCode) {
 watchMembers(roomCode);
 watchOnlinePhase();
 watchOnlineSettings();
+watchOnlineConnection();
 }
 
 // 参加者一覧をリアルタイム同期する
@@ -237,18 +258,18 @@ showLobby(roomCode);
 async function joinRoom() {
   if (busy) return;
 
-  const name = nameInput.value.trim();
+  const name = joinNameInput.value.trim();
 
   // 名前が未入力の場合
   if (!name) {
     showStatus("名前を入力してください。");
-    nameInput.focus();
+    joinNameInput.focus();
     return;
   }
 
   if (name.length > 20) {
     showStatus("名前は20文字以内で入力してください。");
-    nameInput.focus();
+    joinNameInput.focus();
     return;
   }
 
@@ -609,7 +630,7 @@ function watchOnlinePhase() {
       if (!meta) return;
 
       onlineIsHost = meta.hostUid === currentUid;
-
+    currentPhase = meta.phase;
       
 if (meta.phase === "lobby") {
   roleRevealBox.hidden = true;
@@ -780,6 +801,30 @@ function scheduleOnlineSettingsSave() {
 }
 
 
+// ========================================
+// ホストの設定変更をFirebaseに反映
+// ========================================
+
+// 役職人数が変更されたとき
+document.querySelectorAll(".online-role-count")
+  .forEach(input => {
+    input.addEventListener("input", () => {
+      validateOnlineRoles();
+      scheduleOnlineSettingsSave();
+    });
+  });
+
+// 詳細設定のスイッチが変更されたとき
+ONLINE_EXTRA_SETTINGS.forEach(setting => {
+  const input = document.getElementById(setting.id);
+
+  input.addEventListener("change", () => {
+    validateOnlineRoles();
+    scheduleOnlineSettingsSave();
+  });
+});
+
+
 // 参加者用の閲覧専用画面を更新
 function renderOnlineGuestSettings(settings) {
   const guestRoles =
@@ -937,9 +982,11 @@ const invitedRoom =
 
 if (invitedRoom && /^\d{6}$/.test(invitedRoom)) {
   roomInput.value = invitedRoom;
+  switchOnlineEntryScreen("join");
 }
 
 // ページを離れたときに監視を解除
+
 window.addEventListener("pagehide", () => {
   if (stopMembersListener) {
     stopMembersListener();
@@ -960,4 +1007,125 @@ window.addEventListener("pagehide", () => {
   if (stopSettingsListener) {
     stopSettingsListener();
   }
+
+  // Firebaseの接続監視を終了する
+  if (stopConnectionListener) {
+    stopConnectionListener();
+  }
 });
+
+
+
+// ========================================
+// 通信切断・再接続への対応
+// ========================================
+
+function watchOnlineConnection() {
+  if (stopConnectionListener) {
+    stopConnectionListener();
+  }
+
+  const connectionRef = ref(
+    db,
+    ".info/connected"
+  );
+
+  stopConnectionListener = onValue(
+    connectionRef,
+    async snapshot => {
+      const connected = snapshot.val() === true;
+
+      if (!connected) {
+        if (connectedOnce) {
+          reconnectNeeded = true;
+          console.log("Firebase接続が切れました");
+        }
+        return;
+      }
+
+      connectedOnce = true;
+
+      // 切断後の再接続だけを処理する
+      if (!reconnectNeeded || reconnecting) return;
+
+      // ゲーム開始後は参加者名簿を変更しない
+      if (currentPhase !== "lobby") return;
+
+      if (!currentRoom || !currentUid) return;
+
+      reconnecting = true;
+
+      try {
+        const name = onlineIsHost
+  ? nameInput.value.trim()
+  : joinNameInput.value.trim();
+
+        await registerMember(
+          currentRoom,
+          name,
+          currentUid
+        );
+
+        reconnectNeeded = false;
+        showStatus("ルームに再接続しました。");
+        console.log("ルームに再入室しました");
+
+      } catch (error) {
+        console.error("再接続エラー：", error);
+
+        showStatus(
+          "ルームへの再接続に失敗しました。再度入室してください。"
+        );
+      } finally {
+        reconnecting = false;
+      }
+    }
+  );
+}
+
+// ========================================
+// ルーム選択画面の切り替え
+// ========================================
+
+const onlineMenuScreen =
+  document.getElementById("online-menu-screen");
+
+const onlineCreateScreen =
+  document.getElementById("online-create-screen");
+
+const onlineJoinScreen =
+  document.getElementById("online-join-screen");
+
+function switchOnlineEntryScreen(screen) {
+  onlineMenuScreen.hidden = screen !== "menu";
+  onlineCreateScreen.hidden = screen !== "create";
+  onlineJoinScreen.hidden = screen !== "join";
+
+  // 画面切り替え時に古いエラーを消す
+  showStatus("");
+}
+
+// 新しいルームを作成
+document.getElementById("open-create-room")
+  .addEventListener("click", () => {
+    switchOnlineEntryScreen("create");
+    nameInput.focus();
+  });
+
+// ルームに参加
+document.getElementById("open-join-room")
+  .addEventListener("click", () => {
+    switchOnlineEntryScreen("join");
+    joinNameInput.focus();
+  });
+
+// 戻るボタン
+document.getElementById("back-from-create")
+  .addEventListener("click", () => {
+    switchOnlineEntryScreen("menu");
+  });
+
+document.getElementById("back-from-join")
+  .addEventListener("click", () => {
+    switchOnlineEntryScreen("menu");
+  });

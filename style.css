@@ -2271,3 +2271,77 @@ textarea:focus-visible {
   outline: 3px solid #f8c794;
   outline-offset: 3px;
 }
+
+
+/* ========================================
+   オンラインルーム選択画面
+======================================== */
+
+#online-game #entry-screen {
+  text-align: center;
+}
+
+#online-game .online-menu-description {
+  color: #acb6cc;
+  font-size: 14px;
+  margin-bottom: 28px;
+  line-height: 1.7;
+}
+
+#online-game #online-create-screen,
+#online-game #online-join-screen {
+  text-align: center;
+}
+
+#online-game #online-create-screen input,
+#online-game #online-join-screen input {
+  display: block;
+  width: min(100%, 380px);
+  margin: 0 auto;
+  font-size: 16px;
+  text-align: left;
+}
+
+#online-game #online-create-screen .field-label,
+#online-game #online-join-screen .field-label {
+  width: min(100%, 380px);
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+/* ルーム参加（サブボタン） */
+#online-game .online-secondary-button {
+  background: #303b57;
+  border: 1px solid #65708b;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+#online-game .online-secondary-button:hover {
+  background: #3e4a68;
+  border-color: #92a0bd;
+}
+
+/* 一つ前の画面に戻る */
+#online-game .online-back-menu {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid #556078;
+  box-shadow: none;
+  color: #b4bdcf;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 48px;
+}
+
+#online-game .online-back-menu:hover {
+  background: #303b57;
+  color: #ffffff;
+  border-color: #8895b2;
+}
+
+/* hidden属性を確実に反映 */
+#online-game [hidden] {
+  display: none !important;
+}

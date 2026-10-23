@@ -158,7 +158,10 @@ async function createRoom() {
 
   try {
     const name = getPlayerName();
-    const user = await getUser();
+
+console.log("① 匿名認証開始");
+const user = await getUser();
+console.log("② 匿名認証成功");
 
     let roomCode = null;
 
@@ -167,6 +170,7 @@ async function createRoom() {
       const candidate = randomRoomCode();
 
       try {
+        console.log("③ データベースに書き込み開始");
         await set(
           ref(db, `rooms/${candidate}/meta`),
           {
@@ -193,9 +197,14 @@ async function createRoom() {
       );
     }
 
-    await registerMember(roomCode, name, user.uid);
 
-    showLobby(roomCode);
+console.log("④ ルーム作成成功");
+
+await registerMember(roomCode, name, user.uid);
+
+console.log("⑤ 参加者登録成功");
+
+showLobby(roomCode);
 
   } catch (error) {
     showStatus("エラー：" + error.message);

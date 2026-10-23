@@ -1867,3 +1867,47 @@ textarea:focus-visible {
   font-size: 14px;
   margin-top: 20px;
 }
+
+
+/* オンライン版から1台モードへ戻るボタン */
+.online-back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: min(100%, 380px);
+  min-height: 52px;
+  margin: 20px auto 0;
+  padding: 14px 20px;
+
+  background: #303b57;
+  color: #ffffff;
+
+  border: 1px solid #65708b;
+  border-radius: 13px;
+
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-decoration: none;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.online-back-button:hover {
+  background: #3c4969;
+  border-color: #a3aec6;
+  transform: translateY(-2px);
+}
+
+.online-back-button:active {
+  transform: scale(0.98);
+}
+
+.online-back-button:focus-visible {
+  outline: 3px solid #f8c794;
+  outline-offset: 3px;
+}

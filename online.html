@@ -14,7 +14,7 @@
 
 
 
-<script type="module" src="./online.js?v=20261024-3"></script>
+<script type="module" src="./online.js?v=20261024-full"></script>
 
 
 
@@ -224,7 +224,7 @@
 
         <!-- 全員共通：初夜の行動画面 -->
         <div id="online-night-screen" hidden>
-          <h2>初夜</h2>
+          <h2 id="online-night-title">初夜</h2>
           <p id="online-night-role"></p>
           <p id="online-night-message"></p>
 
@@ -240,6 +240,7 @@
             </button>
           </div>
 
+          <button id="online-night-skip" type="button" hidden>交換しない／行動なしで完了</button>
           <p id="online-night-result" role="status"></p>
           
 <button id="online-night-done" type="button" hidden>
@@ -257,15 +258,15 @@
 
 <!-- 全員共通：朝の画面 -->
 <div id="online-day-screen" hidden>
-  <h2>朝になりました</h2>
+  <h2 id="online-day-title">朝になりました</h2>
   <p class="online-wait-message">
-    初夜の行動が終了しました。
+    全員の夜の行動が終了しました。
   </p>
   <h3>参加者一覧</h3>
   <div id="online-day-members"></div>
+  <p id="online-private-result" role="status"></p>
   <p id="online-day-notice">
-    現在は初夜の結果判定を実装していないため、
-    襲撃結果や占い結果はまだ表示されません。
+    夜の結果を取得しています。
   </p>
   
 <button id="online-start-discussion" type="button" hidden>
@@ -291,6 +292,7 @@
   <h3>参加者</h3>
   <div id="online-discussion-members"></div>
 
+<button id="online-skip-vote" type="button" hidden>投票をスキップする</button>
 <button id="online-start-vote" type="button" hidden>
   議論を終了して投票へ進む
 </button>
@@ -299,7 +301,7 @@
 
 <!-- 昼の投票画面 -->
 <div id="online-vote-screen" hidden>
-  <h2>昼の投票</h2>
+  <h2 id="online-vote-title">昼の投票</h2>
   <p>処刑したいプレイヤーを1人選んでください。</p>
   <label class="field-label" for="online-vote-target">
     投票先
@@ -322,6 +324,8 @@
   <h2>投票結果</h2>
   <div id="online-vote-results"></div>
   <h3 id="online-execution-result"></h3>
+  <p id="online-public-votes-result"></p>
+  <button id="online-next-night" type="button" hidden>次の日の夜へ進む</button>
   
 <div id="online-survival-section">
   <h3>生存者</h3>
@@ -336,6 +340,18 @@
   </p>
 </div>
 
+
+
+<!-- ゲーム終了画面 -->
+<div id="online-game-over-screen" hidden>
+  <h2 id="online-winner">ゲーム終了</h2>
+  <h3>全員の役職・生存状況</h3>
+  <div id="online-final-roles"></div>
+  <h3>ゲームの記録</h3>
+  <div id="online-game-history"></div>
+  <p>新しく遊ぶ場合は、ゲームモード選択に戻ってルームを作成してください。</p>
+  <a href="./index.html">ゲームモード選択へ戻る</a>
+</div>
 
         <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>

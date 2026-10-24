@@ -1,2425 +1,281 @@
-
-
-import {
-  ref,
-  set,
-  onValue,
-  get,
-  onDisconnect,
-  serverTimestamp,
-  runTransaction
-} from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
-
-
-
-
-import {
-  db,
-  loginAnonymously
-} from "./firebase-config.js";
-
-const entryScreen = document.getElementById("entry-screen");
-const lobbyScreen = document.getElementById("lobby-screen");
-const nameInput = document.getElementById("online-name");
-const joinNameInput =
-  document.getElementById("online-join-name");
-const roomInput = document.getElementById("room-code");
-const statusText = document.getElementById("online-status");
-const membersBox = document.getElementById("online-members");
-const memberCount = document.getElementById("member-count");
-const createButton = document.getElementById("create-room");
-const joinButton = document.getElementById("join-room");
-
-
-let currentRoom = null;
-let currentUid = null;
-let currentHostUid = null;
-let currentMembers = [];
-
-let stopMembersListener = null;
-let busy = false;
-let stopConnectionListener = null;
-let currentPhase = "lobby";
-let reconnectNeeded = false;
-let connectedOnce = false;
-let reconnecting = false;
-
-function showStatus(message) {
-  statusText.textContent = message;
-}
-
-function setBusy(value) {
-  busy = value;
-  createButton.disabled = value;
-  joinButton.disabled = value;
-}
-
-
-function getPlayerName() {
-  // ルーム作成画面の名前入力欄を使用する
-  const name = nameInput.value.trim();
-
-  if (!name) {
-    nameInput.focus();
-    throw new Error("プレイヤー名を入力してください。");
-  }
-
-  if (name.length > 20) {
-    nameInput.focus();
-    throw new Error("名前は20文字以内で入力してください。");
-  }
-
-  return name;
-}
-
-
-function randomRoomCode() {
-  // 6桁のルーム番号
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-
-  return String(100000 + array[0] % 900000);
-}
-
-async function getUser() {
-  const user = await loginAnonymously();
-  currentUid = user.uid;
-  return user;
-}
-
-function getMemberPath(roomCode, uid) {
-  return `rooms/${roomCode}/members/${uid}`;
-}
-
-// 自分をルームの参加者として登録する
-
-async function registerMember(roomCode, name, uid) {
-  const memberRef = ref(
-    db,
-    getMemberPath(roomCode, uid)
-  );
-
-  // 接続が切れたときに、自分の参加者情報を削除
-  // 登録より先に設定しておく
-  await onDisconnect(memberRef).remove();
-
-  // 参加者を登録
-  await set(memberRef, {
-    name,
-    joinedAt: Date.now()
-  });
-
-  console.log("参加者登録完了：", name);
-}
-
-
-// ルームに入った後の画面
-function showLobby(roomCode) {
-  currentRoom = roomCode;
-
-  entryScreen.hidden = true;
-  lobbyScreen.hidden = false;
-
-  document.getElementById("display-room-code")
-    .textContent = roomCode;
-
-  history.replaceState(
-    null,
-    "",
-    `${location.pathname}?room=${roomCode}`
-  );
-
-  showStatus("ルームに接続しました。");
-
-watchMembers(roomCode);
-watchOnlinePhase();
-watchOnlineSettings();
-watchOnlineConnection();
-}
-
-// 参加者一覧をリアルタイム同期する
-
-function renderMemberLists() {
-  const roleMemberList = document.getElementById("online-role-member-list");
-
-  membersBox.replaceChildren();
-  if (roleMemberList) roleMemberList.replaceChildren();
-
-  currentMembers.forEach(([uid, member]) => {
-    function createMemberRow() {
-      const item = document.createElement("div");
-      item.className = "online-member";
-
-      const name = document.createElement("strong");
-      name.textContent = member.name;
-
-      const mark = document.createElement("span");
-      mark.textContent =
-        uid === currentHostUid
-          ? "ホスト"
-          : uid === currentUid
-            ? "あなた"
-            : "参加中";
-
-      item.append(name, mark);
-      return item;
-    }
-
-    membersBox.appendChild(createMemberRow());
-    if (roleMemberList) {
-      roleMemberList.appendChild(createMemberRow());
-    }
-  });
-}
-
-function watchMembers(roomCode) {
-  if (stopMembersListener) {
-    stopMembersListener();
-    stopMembersListener = null;
-  }
-
-  const membersRef = ref(db, `rooms/${roomCode}/members`);
-
-  stopMembersListener = onValue(
-    membersRef,
-    snapshot => {
-      const data = snapshot.val() || {};
-
-      currentMembers = Object.entries(data).sort(
-        (a, b) =>
-          (a[1].joinedAt || 0) - (b[1].joinedAt || 0)
-      );
-
-      memberCount.textContent = `参加者（${currentMembers.length}人）`;
-      memberCount.dataset.playerCount = String(currentMembers.length);
-
-      renderMemberLists();
-
-      if (!onlineIsHost && sharedOnlineSettings) {
-        renderOnlineGuestSettings(sharedOnlineSettings);
-      }
-
-      if (onlineIsHost) {
-        validateOnlineRoles();
-      }
-    },
-    error => {
-      console.error("参加者一覧の取得エラー:", error);
-      showStatus("参加者一覧を取得できません：" + error.message);
-    }
-  );
-}
-
-// 新しいルームを作成する
-
-async function createRoom() {
-  if (busy) return;
-
-  let step = "名前の確認";
-
-  setBusy(true);
-  showStatus("ルームを作成しています…");
-
-  try {
-    const name = getPlayerName();
-
-    step = "匿名認証";
-    console.log("① 匿名認証開始");
-
-    const user = await getUser();
-
-    console.log("② 匿名認証成功");
-
-    let roomCode = null;
-
-    // 新しい6桁のルーム番号を発行
-    step = "ルーム情報の作成";
-
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = randomRoomCode();
-
-      try {
-        console.log(
-          "③ ルーム情報を書き込み：",
-          candidate
-        );
-
-        await set(
-          ref(db, `rooms/${candidate}/meta`),
-          {
-            hostUid: user.uid,
-            phase: "lobby",
-            createdAt: Date.now()
-          }
-        );
-
-        roomCode = candidate;
-        break;
-
-      } catch (error) {
-        console.error(
-          "ルーム情報の作成に失敗：",
-          error
-        );
-
-        // 番号衝突以外の問題もあり得るため、
-        // 自動で繰り返さずエラーを表示する
-        throw error;
-      }
-    }
-
-    if (!roomCode) {
-      throw new Error(
-        "ルーム番号を作成できませんでした。"
-      );
-    }
-
-    console.log("④ ルーム情報の作成成功");
-
-    // 自分を参加者として登録
-    step = "参加者の登録";
-
-    console.log("⑤ 参加者登録開始");
-
-    await registerMember(
-      roomCode,
-      name,
-      user.uid
-    );
-
-    console.log("⑥ 参加者登録成功");
-
-    // 初期設定をFirebaseに保存
-    step = "ゲーム設定の保存";
-
-    console.log("⑦ ゲーム設定の保存開始");
-
-    const initialSettings = collectOnlineSettings();
-
-    console.log(
-      "保存する設定：",
-      initialSettings
-    );
-
-    await set(
-      ref(db, `rooms/${roomCode}/settings`),
-      initialSettings
-    );
-
-    console.log("⑧ ゲーム設定の保存成功");
-
-    // すべて成功してから待機画面へ移動
-    showLobby(roomCode);
-
-  } catch (error) {
-    console.error(
-      `${step}でエラー：`,
-      error
-    );
-
-    if (error.code === "PERMISSION_DENIED" ||
-        error.code === "permission-denied") {
-      showStatus(
-        `${step}に失敗しました。Firebaseの設定を確認してください。`
-      );
-    } else {
-      showStatus(
-        `${step}に失敗しました：${error.message}`
-      );
-    }
-
-  } finally {
-    setBusy(false);
-  }
-}
-
-
-
-async function joinRoom() {
-  if (busy) return;
-
-  const name = joinNameInput.value.trim();
-
-  // 名前が未入力の場合
-  if (!name) {
-    showStatus("名前を入力してください。");
-    joinNameInput.focus();
-    return;
-  }
-
-  if (name.length > 20) {
-    showStatus("名前は20文字以内で入力してください。");
-    joinNameInput.focus();
-    return;
-  }
-
-  const roomCode = roomInput.value.trim();
-
-  if (!/^\d{6}$/.test(roomCode)) {
-    showStatus("6桁のルーム番号を入力してください。");
-    roomInput.focus();
-    return;
-  }
-
-  setBusy(true);
-  showStatus("ルームに参加しています…");
-
-  try {
-    const user = await getUser();
-
-    await registerMember(roomCode, name, user.uid);
-
-    showLobby(roomCode);
-
-  } catch (error) {
-    console.error("ルーム参加エラー：", error);
-
-    if (error.code === "PERMISSION_DENIED" ||
-        error.code === "permission-denied") {
-      showStatus(
-        "ルームが見つからないか、すでにゲームが始まっています。"
-      );
-    } else {
-      showStatus(
-        "参加できませんでした。通信状態を確認して、もう一度お試しください。"
-      );
-    }
-  } finally {
-    setBusy(false);
-  }
-}
-
-
-
-// ========================================
-// オンライン役職設定・配布
-// ========================================
-
-const ONLINE_ROLES = [
-  { name: "人狼", description: "毎晩1人を襲撃します。" },
-  { name: "狂人", description: "人狼陣営の味方です。" },
-  { name: "占い師", description: "毎晩1人を占います。" },
-  { name: "騎士", description: "毎晩1人を護衛します。" },
-  { name: "霊媒師", description: "処刑された人の正体を調べます。" },
-  { name: "てるてる", description: "昼に処刑されると単独勝利します。" },
-  { name: "怪盗", description: "最初の夜に役職を交換できます。" }
+/* オンライン人狼：無料版（ホスト判定方式） */
+import { ref, get, set, update, onValue, runTransaction } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js';
+import { db, loginAnonymously } from './firebase-config.js';
+import {validatePlayerCount,getRoundPath,getAliveUids,needsNightAction,checkGameWinner,countCompleted,calculateVotes,applyThiefSwap,getSeerResult,getMediumResult,resolveExecution,resolveNight} from './online-engine.js';
+
+const $ = id => document.getElementById(id);
+const screens = ['entry-screen','lobby-screen','online-role-reveal','online-night-screen','online-day-screen','online-discussion-screen','online-vote-screen','online-vote-result-screen','online-game-over-screen'];
+const roleNames = ['人狼','狂人','占い師','騎士','霊媒師','てるてる','怪盗'];
+const extras = [
+  ['madmanKnowsWolves','online-madman-knows-wolves','狂人が人狼を把握できる'],
+  ['allowConsecutiveGuard','online-consecutive-guard','騎士の連続護衛を許可'],
+  ['roleMissing','online-role-missing','役職欠けを有効にする'],
+  ['publicVotes','online-public-votes','投票履歴を公開する'],
+  ['randomEvents','online-random-events','ランダム事件カード']
 ];
-
-const roleSettingsBox =
-  document.getElementById("online-role-settings");
-const roleListBox =
-  document.getElementById("online-role-list");
-const roleRevealBox =
-  document.getElementById("online-role-reveal");
-const roleErrorBox =
-  document.getElementById("online-role-error");
-const startGameButton =
-  document.getElementById("online-start-game");
-const roleMissingInput =
-  document.getElementById("online-role-missing");
-
-let onlineIsHost = false;
-let onlineRoleStarted = false;
-let stopPhaseListener = null;
-let stopRoleListener = null;
-let stopReadyListener = null;
-
-// 役職設定欄を生成
-ONLINE_ROLES.forEach((role, index) => {
-  const row = document.createElement("div");
-  row.className = "online-role-row";
-
-  const label = document.createElement("label");
-  label.textContent = role.name;
-  label.htmlFor = `online-role-${index}`;
-
-  const input = document.createElement("input");
-  input.type = "number";
-  input.min = "0";
-  input.max = "20";
-  input.step = "1";
-  input.value = index === 0 ? "1" : "0";
-  input.id = `online-role-${index}`;
-  input.className = "online-role-count";
-
-  input.addEventListener("input", validateOnlineRoles);
-
-  row.append(label, input);
-  roleListBox.appendChild(row);
-});
-
-roleMissingInput.addEventListener(
-  "change",
-  validateOnlineRoles
-);
-
-function getOnlineRoleCounts() {
-  return ONLINE_ROLES.map((_, index) => {
-    const value = document.getElementById(
-      `online-role-${index}`
-    ).value;
-
-    return value.trim() === "" ? NaN : Number(value);
-  });
+let room = null, uid = null, data = null, offRoom = null, currentView = '', busy = false;
+let entryView = 'menu', timer = null, savedSettings = '', lastRenderedPhase = '';
+const roomRef = field => ref(db, field?.startsWith('rooms/') ? field : `rooms/${room}${field ? '/' + field : ''}`);
+const roundField = (field, round = data?.meta?.round || 1) => getRoundPath(room, round, field);
+const myRole = () => data?.roles?.[uid] || '';
+const host = () => !!uid && data?.meta?.hostUid === uid;
+const phase = () => data?.meta?.phase || 'lobby';
+const round = () => Number(data?.meta?.round || 1);
+const members = () => data?.members || {};
+const alive = () => getAliveUids(members(), data?.eliminated || {});
+const living = u => alive().includes(u);
+const nameOf = u => members()[u]?.name || '不明な参加者';
+const setting = k => data?.settings?.extras?.[k] === true;
+const thisRound = () => data?.rounds?.[round()] || {};
+const notification = txt => { $('online-status').textContent = txt || ''; };
+const esc = txt => String(txt ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const renderList = (element, rows) => { element.replaceChildren(); for (const row of rows) {const el = document.createElement('div');el.className = 'online-member';const a=document.createElement('strong');a.textContent=row[0];const b=document.createElement('span');b.textContent=row[1];el.append(a,b);element.append(el);} };
+const setView = id => { for (const screen of screens) {const el=$(screen);if(el)el.hidden=screen!==id;} if(id!==currentView) { currentView=id; if(id==='entry-screen') switchEntry(entryView); } };
+const opt = (select, candidates, label='相手を選択してください') => {const old=select.value;select.replaceChildren(new Option(label,''));for(const u of candidates)select.add(new Option(nameOf(u),u));if(candidates.includes(old))select.value=old;};
+const randomIndex = n => {const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};
+const shuffled = a => {const b=[...a];for(let i=b.length-1;i>0;i--){const j=randomIndex(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
+function switchEntry(section) {
+  entryView=section;
+  $('online-menu-screen').hidden=section!=='menu';
+  $('online-create-screen').hidden=section!=='create';
+  $('online-join-screen').hidden=section!=='join';
 }
+$('open-create-room').onclick=()=>switchEntry('create');
+$('open-join-room').onclick=()=>switchEntry('join');
+$('back-from-create').onclick=()=>switchEntry('menu');
+$('back-from-join').onclick=()=>switchEntry('menu');
+const fromUrl = new URLSearchParams(location.search).get('room');
+if(fromUrl && /^\d{6}$/.test(fromUrl)) {$('room-code').value=fromUrl;switchEntry('join');}
 
-function validateOnlineRoles() {
-  const counts = getOnlineRoleCounts();
-
-  const total = counts.reduce(
-    (sum, count) => sum + count,
-    0
-  );
-
-  const numberOfPlayers = Number(
-    memberCount.dataset.playerCount || 0
-  );
-
-  const villagers = numberOfPlayers - total;
-
-  document.getElementById(
-    "online-villager-count"
-  ).textContent = `村人：${villagers}人`;
-
-  let error = "";
-
-  if (numberOfPlayers < 3 || numberOfPlayers > 20) {
-    error = "プレイヤーは3〜20人必要です。";
-  } else if (
-    counts.some(count =>
-      !Number.isInteger(count) || count < 0
-    )
-  ) {
-    error = "役職人数は0以上の整数にしてください。";
-  } else if (counts[0] < 1) {
-    error = "人狼は最低1人必要です。";
-  } else if (villagers < 1) {
-    error = "村人を最低1人残してください。";
-  } else if (
-    counts[0] >= numberOfPlayers - counts[0]
-  ) {
-    error = "人狼の人数が多すぎます。";
-  } else if (counts[5] > 1 || counts[6] > 1) {
-    error = "てるてると怪盗は各1人までです。";
-  } else if (
-    roleMissingInput.checked &&
-    counts.slice(1).every(count => count === 0)
-  ) {
-    error = "役職欠けには人狼以外の特殊役職が必要です。";
+async function enterRoom(roomCode, nickname, create=false) {
+ if(busy)return;busy=true;notification('接続しています…');
+ try {
+  const me=await loginAnonymously();uid=me.uid;
+  room=roomCode;
+  if(create){
+   const meta={hostUid:uid,phase:'lobby',round:1,createdAt:Date.now()};
+   const transaction=await runTransaction(roomRef('meta'),v=>v===null?meta:undefined,{applyLocally:false});
+   if(!transaction.committed)throw Error('ルーム番号が重複しました。もう一度作成してください。');
+  }else{
+   const s=await get(roomRef('meta'));if(!s.exists())throw Error('ルームが見つかりません。');
+   const own=await get(roomRef(`members/${uid}`));
+   if(s.val().phase!=='lobby'&&!own.exists())throw Error('ゲーム開始後は新規参加できません。');
   }
-
-  roleErrorBox.textContent = error;
-  startGameButton.disabled =
-    Boolean(error) || onlineRoleStarted;
-
-  return error;
+  const memberRef=roomRef(`members/${uid}`);
+  const existing=await get(memberRef);
+  if(!existing.exists())await set(memberRef,{name:nickname,joinedAt:Date.now()});
+  history.replaceState(null,'',`${location.pathname}?room=${room}`);
+  if(offRoom)offRoom();
+  offRoom=onValue(roomRef(''),snap=>{if(!snap.exists()){notification('ルームが存在しません。');return;}data=snap.val();render();},err=>notification('同期エラー：'+err.message));
+  notification('');
+ }catch(e){console.error(e);notification('接続に失敗：'+e.message);room=null;}
+ finally{busy=false;}
 }
+$('create-room').onclick=()=>{const n=$('online-name').value.trim();if(!n||n.length>20){notification('名前を1〜20文字で入力してください。');return;}enterRoom(String(100000+randomIndex(900000)),n,true);};
+$('join-room').onclick=()=>{const n=$('online-join-name').value.trim(),c=$('room-code').value.trim();if(!n||n.length>20){notification('名前を1〜20文字で入力してください。');return;}if(!/^\d{6}$/.test(c)){notification('6桁のルーム番号を入力してください。');return;}enterRoom(c,n);};
+$('copy-room-link').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);notification('招待リンクをコピーしました。');}catch(e){notification('コピーできませんでした。');}};
 
-function shuffleOnlineRoles(items) {
-  const result = [...items];
-
-  for (let i = result.length - 1; i > 0; i--) {
-    const random = new Uint32Array(1);
-    crypto.getRandomValues(random);
-
-    const j = random[0] % (i + 1);
-
-    [result[i], result[j]] =
-      [result[j], result[i]];
+// 役職人数・詳細設定
+for(const [i,r] of roleNames.entries()){
+ const row=document.createElement('div');row.className='online-role-row';const label=document.createElement('label');label.textContent=r;label.htmlFor='online-role-'+i;
+ const inp=document.createElement('input');inp.type='number';inp.id='online-role-'+i;inp.className='online-role-count';inp.min='0';inp.max='20';inp.value=i===0?'1':'0';inp.addEventListener('input',()=>{updateRoleValidity();saveSettingsSoon();});row.append(label,inp);$('online-role-list').append(row);
+}
+for(const [,id] of extras){$(id).addEventListener('change',()=>{updateRoleValidity();saveSettingsSoon();});}
+function collectSettings(){return {roleCounts:Object.fromEntries(roleNames.map((_,i)=>[i,Number($('online-role-'+i).value)])),extras:Object.fromEntries(extras.map(([k,id])=>[k,$(id).checked]))};}
+function validateSettings(s){const n=Object.keys(members()).length;const counts=roleNames.map((_,i)=>s.roleCounts[i]);const sum=counts.reduce((a,b)=>a+b,0);
+ if(!validatePlayerCount(n))return '参加者は3〜20人必要です。';
+ if(counts.some(x=>!Number.isInteger(x)||x<0||x>20))return '役職人数は0〜20の整数にしてください。';
+ if(counts[0]<1||counts[0]>=n-counts[0])return '人狼の人数を調整してください。';
+ if(n-sum<1)return '村人を最低1人残してください。';
+ if(counts[5]>1||counts[6]>1)return 'てるてる・怪盗は各1人までです。';
+ if(s.extras.roleMissing && counts.slice(1).every(x=>x===0))return '役職欠けには特殊役職が必要です。';return '';
+}
+function updateRoleValidity(){if(!data)return;const s=collectSettings();const n=Object.keys(members()).length;const cnt=roleNames.reduce((a,_,i)=>a+s.roleCounts[i],0);
+ $('online-villager-count').textContent=`村人：${n-cnt}人`;const err=validateSettings(s);$('online-role-error').textContent=err;$('online-start-game').disabled=!!err;}
+let saveJob=0;
+function saveSettingsSoon(){clearTimeout(saveJob);if(!host()||phase()!=='lobby')return;saveJob=setTimeout(async()=>{try{const s=collectSettings();if(roleNames.some((_,i)=>!Number.isInteger(s.roleCounts[i])))return;await set(roomRef('settings'),s);}catch(e){notification('設定保存：'+e.message);}},350);}
+function renderLobby(){setView('lobby-screen');$('display-room-code').textContent=room;
+ const list=Object.entries(members()).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
+ $('member-count').textContent=`参加者（${list.length}人）`;
+ renderList($('online-members'),list.map(([id,m])=>[m.name,id===data.meta.hostUid?'ホスト':id===uid?'あなた':'参加中']));
+ $('online-role-settings').hidden=!host();$('online-guest-settings').hidden=host();
+ if(host()){
+  const s=data.settings;
+  if(s && savedSettings!==JSON.stringify(s)){
+   for(let i=0;i<roleNames.length;i++){$('online-role-'+i).value=s.roleCounts?.[i]??0;}
+   for(const [k,id] of extras)$(id).checked=s.extras?.[k]===true;
+   savedSettings=JSON.stringify(s);
   }
-
-  return result;
+  updateRoleValidity();
+ }else{
+  const s=data.settings;
+  renderList($('online-guest-role-list'),roleNames.map((r,i)=>[r,`${s?.roleCounts?.[i]||0}人`]));
+  const sum=roleNames.reduce((a,_,i)=>a+Number(s?.roleCounts?.[i]||0),0);
+  $('online-guest-villagers').textContent=`村人：${Math.max(0,list.length-sum)}人`;
+  renderList($('online-guest-extras'),extras.map(([k,,label])=>[label,s?.extras?.[k]?'ON':'OFF']));
+ }
 }
-
-async function startOnlineRoleGame() {
-  
-if (!currentRoom || !onlineIsHost || onlineRoleStarted) {
-  console.warn("ゲーム開始条件を満たしていません", {
-    currentRoom,
-    onlineIsHost,
-    onlineRoleStarted
-  });
-  return;
-}
-
-const validationError = validateOnlineRoles();
-
-if (validationError) {
-  showStatus(validationError);
-  console.warn("役職設定エラー：", validationError);
-  return;
-}
-
-showStatus("役職を配布しています…");
-console.log("ゲーム開始処理を開始しました");
-
-
-  onlineRoleStarted = true;
-  startGameButton.disabled = true;
-
-  
-try {
-  // 入力途中の保存タイマーを止める
-  clearTimeout(settingsSaveTimer);
-
-  // 役職配布前に最新の設定を確定する
-  await saveOnlineSettings();
-
-  const snapshot = await get(
-    ref(db, `rooms/${currentRoom}/members`)
-  );
-
-
-    const members = Object.keys(snapshot.val() || {});
-    const counts = getOnlineRoleCounts();
-
-    const roles = [];
-
-    ONLINE_ROLES.forEach((role, index) => {
-      for (let i = 0; i < counts[index]; i++) {
-        roles.push(role.name);
-      }
-    });
-
-    while (roles.length < members.length) {
-      roles.push("村人");
-    }
-
-    if (roles.length !== members.length) {
-      throw new Error("参加人数が変更されました。");
-    }
-
-    // 役職欠け：特殊役職を1枚村人に置き換える
-    if (roleMissingInput.checked) {
-      const candidates = roles
-        .map((role, index) => ({ role, index }))
-        .filter(item =>
-          item.role !== "人狼" &&
-          item.role !== "村人"
-        );
-
-      if (candidates.length === 0) {
-        throw new Error("欠ける役職がありません。");
-      }
-
-      const random = new Uint32Array(1);
-      crypto.getRandomValues(random);
-
-      const choice =
-        candidates[random[0] % candidates.length];
-
-      roles[choice.index] = "村人";
-    }
-
-    const shuffled = shuffleOnlineRoles(roles);
-    const assignments = {};
-
-    members.forEach((uid, index) => {
-      assignments[uid] = shuffled[index];
-    });
-
-    showStatus("役職を配布しています…");
-
-    // 役職の保存を完了してからゲームを開始
-    await set(
-      ref(db, `rooms/${currentRoom}/roles`),
-      assignments
-    );
-
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/phase`),
-      "firstNight"
-    );
-
-    showStatus("役職を配布しました。");
-
- 
-
-  } catch (error) {
-    console.error("役職配布に失敗：", error);
-    showStatus(
-      "役職配布エラー：" +
-      (error.code || "unknown") +
-      " / " + error.message
-    );
-    roleErrorBox.textContent =
-      "ゲームを開始できませんでした：" + error.message;
-  } finally {
-    onlineRoleStarted = false;
-    validateOnlineRoles();
-  }
-}
-
-
-startGameButton.addEventListener(
-  "click",
-  startOnlineRoleGame
-);
-
-// 自分の役職だけを表示
-function showMyOnlineRole(role) {
-  const roleName =
-    document.getElementById("online-my-role");
-  const description =
-    document.getElementById("online-my-role-description");
-
-  roleName.textContent = role;
-
-  const found = ONLINE_ROLES.find(
-    item => item.name === role
-  );
-
-  description.textContent = found
-    ? found.description
-    : "特殊能力のない村人です。";
-}
-
-// 役職確認完了
-document.getElementById("online-ready-button")
-  .addEventListener("click", async () => {
-    if (!currentRoom || !currentUid) return;
-
-    const button =
-      document.getElementById("online-ready-button");
-
-    button.disabled = true;
-
-    try {
-      await set(
-        ref(db,
-          `rooms/${currentRoom}/ready/${currentUid}`
-        ),
-        true
-      );
-
-      button.textContent = "確認完了";
-    } catch (error) {
-      button.disabled = false;
-      showStatus("確認エラー：" + error.message);
-    }
-  });
-
-
-function watchOnlineReady() {
-  if (stopReadyListener) {
-    stopReadyListener();
-  }
-
-  stopReadyListener = onValue(
-    ref(db, `rooms/${currentRoom}/ready`),
-    snapshot => {
-      const ready = snapshot.val() || {};
-
-      const count = Object.values(ready)
-        .filter(value => value === true)
-        .length;
-
-      const total = Number(
-        memberCount.dataset.playerCount || 0
-      );
-
-      document.getElementById(
-        "online-ready-count"
-      ).textContent =
-        `役職確認済み：${count} / ${total}人`;
-
-      const button =
-        document.getElementById("online-ready-button");
-
-      if (ready[currentUid] === true) {
-        button.disabled = true;
-        button.textContent = "確認完了";
-      }
-
-      // ホストだけが初夜へ進める
-      updateGoNightButton();
-
-      goNightButton.disabled =
-        !onlineIsHost ||
-        total < 3 ||
-        count !== total;
-    },
-    error => {
-      console.error("役職確認の同期エラー：", error);
-      showStatus("役職の確認状況を取得できませんでした。");
-    }
-  );
-}
-
-
-// 現在のフェーズを監視
-function watchOnlinePhase() {
-  if (stopPhaseListener) stopPhaseListener();
-
-  stopPhaseListener = onValue(
-    ref(db, `rooms/${currentRoom}/meta`),
-    snapshot => {
-      const meta = snapshot.val();
-
-      if (!meta) return;
-
-      
-currentHostUid = meta.hostUid;
-onlineIsHost = currentHostUid === currentUid;
-renderMemberLists();
-
-    currentPhase = meta.phase;
-      
-if (meta.phase === "lobby") {
-  roleRevealBox.hidden = true;
-
-  updateOnlineSettingsVisibility();
-
-  if (onlineIsHost) {
-    validateOnlineRoles();
-  } else {
-    renderOnlineGuestSettings(
-      sharedOnlineSettings
-    );
-  }
-}
-
-
-      if (meta.phase === "firstNight") {
-        console.log("役職確認画面へ移動します", {
-  phase: meta.phase,
-  currentUid
-});
-        updateGoNightButton();
-        // 待機画面から役職確認画面へ
-        document.getElementById(
-          "entry-screen"
-        ).hidden = true;
-
-        document.getElementById(
-          "lobby-screen"
-        ).hidden = true;
-
-        roleSettingsBox.hidden = true;
-        roleRevealBox.hidden = false;
-
-        if (stopRoleListener) stopRoleListener();
-
-        stopRoleListener = onValue(
-          ref(db,
-            `rooms/${currentRoom}/roles/${currentUid}`
-          ),
-          snapshot => {
-            
-
-if (snapshot.exists()) {
-  const role = snapshot.val();
-  console.log("役職取得成功", {
-    uid: currentUid,
-    role: role
-  });
-  showMyOnlineRole(role);
-  showStatus("");
-} else {
-  console.error("役職データが存在しません", {
-    room: currentRoom,
-    uid: currentUid
-  });
-  showStatus("自分の役職が見つかりません。");
-}
-
-
-          },
-          
-error => {
-  console.error("役職取得エラー", {
-    code: error.code,
-    message: error.message,
-    uid: currentUid
-  });
-  showStatus(
-    "役職を読み込めません：" +
-    (error.code || error.message)
-  );
-}
-
-        );
-
-        watchOnlineReady();
-      }
-      if (meta.phase === "night") {
-  enterOnlineNight();
-}
-
-if (meta.phase === "day") {
-  enterOnlineDay();
-}
-
-if (meta.phase === "discussion") {
-  enterOnlineDiscussion(meta);
-}
-
-
-if (meta.phase === "voting") {
-  enterOnlineVoting();
-}
-
-if (meta.phase === "voteResult") {
-  enterOnlineVoteResult();
-}
-
-      
-    },
-    
-error => {
-  console.error("進行同期エラー：", error);
-  showStatus(
-    "進行同期エラー：" +
-    (error.code || "unknown") +
-    " / " + error.message
-  );
-}
-
-  );
-}
-
-
-// ========================================
-// オンライン設定の共有・同期
-// ========================================
-
-const ONLINE_EXTRA_SETTINGS = [
-  {
-    key: "madmanKnowsWolves",
-    id: "online-madman-knows-wolves",
-    label: "狂人が人狼を把握できる"
-  },
-  {
-    key: "allowConsecutiveGuard",
-    id: "online-consecutive-guard",
-    label: "騎士の連続護衛を許可"
-  },
-  {
-    key: "roleMissing",
-    id: "online-role-missing",
-    label: "役職欠けを有効にする"
-  },
-  {
-    key: "publicVotes",
-    id: "online-public-votes",
-    label: "投票履歴を公開する"
-  },
-  {
-    key: "randomEvents",
-    id: "online-random-events",
-    label: "ランダム事件カード"
-  }
-];
-
-let stopSettingsListener = null;
-let settingsSaveTimer = null;
-let settingsSavePromise = Promise.resolve();
-let sharedOnlineSettings = null;
-
-// 現在の入力欄から設定を読み取る
-function collectOnlineSettings() {
-  const roleCounts = {};
-
-  ONLINE_ROLES.forEach((role, index) => {
-    roleCounts[String(index)] =
-      getOnlineRoleCounts()[index];
-  });
-
-  const extras = {};
-
-  ONLINE_EXTRA_SETTINGS.forEach(setting => {
-    extras[setting.key] =
-      document.getElementById(setting.id).checked;
-  });
-
-  return {
-    roleCounts,
-    extras
-  };
-}
-
-
-function saveOnlineSettings() {
-  // ホストだけが設定を保存
-  if (!currentRoom || !onlineIsHost) {
-    return Promise.resolve();
-  }
-
-  const data = collectOnlineSettings();
-
-  // 未入力や不正な人数は保存しない
-  const counts = Object.values(data.roleCounts);
-
-  if (
-    counts.some(count =>
-      !Number.isInteger(count) ||
-      count < 0 ||
-      count > 20
-    )
-  ) {
-    return Promise.resolve();
-  }
-
-  // ゲーム開始が可能かどうかに関係なく設定を保存
-  settingsSavePromise = settingsSavePromise
-    .catch(() => {})
-    .then(async () => {
-      await set(
-        ref(db, `rooms/${currentRoom}/settings`),
-        data
-      );
-
-      console.log("設定保存成功：", data);
-    });
-
-  settingsSavePromise.catch(error => {
-    console.error("設定保存エラー：", error);
-    showStatus(
-      "設定を保存できませんでした。通信状態を確認してください。"
-    );
-  });
-
-  return settingsSavePromise;
-}
-
-
-// 細かい入力操作のたびに通信しない
-
-function scheduleOnlineSettingsSave() {
-  clearTimeout(settingsSaveTimer);
-
-  settingsSaveTimer = setTimeout(() => {
-    saveOnlineSettings();
-  }, 300);
-}
-
-
-// ========================================
-// ホストの設定変更をFirebaseに反映
-// ========================================
-
-// 役職人数が変更されたとき
-document.querySelectorAll(".online-role-count")
-  .forEach(input => {
-    input.addEventListener("input", () => {
-      validateOnlineRoles();
-      scheduleOnlineSettingsSave();
-    });
-  });
-
-// 詳細設定のスイッチが変更されたとき
-ONLINE_EXTRA_SETTINGS.forEach(setting => {
-  const input = document.getElementById(setting.id);
-
-  input.addEventListener("change", () => {
-    validateOnlineRoles();
-    scheduleOnlineSettingsSave();
-  });
-});
-
-
-// 参加者用の閲覧専用画面を更新
-function renderOnlineGuestSettings(settings) {
-  const guestRoles =
-    document.getElementById("online-guest-role-list");
-
-  const guestExtras =
-    document.getElementById("online-guest-extras");
-
-  const villagerText =
-    document.getElementById("online-guest-villagers");
-
-  guestRoles.replaceChildren();
-  guestExtras.replaceChildren();
-
-  if (!settings ||
-      !settings.roleCounts ||
-      !settings.extras) {
-    villagerText.textContent =
-      "ホストの設定を待っています。";
-    return;
-  }
-
-  const counts = ONLINE_ROLES.map((_, index) =>
-    Number(settings.roleCounts[String(index)] ?? 0)
-  );
-
-  ONLINE_ROLES.forEach((role, index) => {
-    const row = document.createElement("div");
-    row.className = "online-readonly-row";
-
-    const name = document.createElement("strong");
-    name.textContent = role.name;
-
-    const count = document.createElement("span");
-    count.textContent = `${counts[index]}人`;
-
-    row.append(name, count);
-    guestRoles.appendChild(row);
-  });
-
-  const playerCount =
-    Number(memberCount.dataset.playerCount || 0);
-
-  const selectedTotal = counts.reduce(
-    (sum, count) => sum + count,
-    0
-  );
-
-  villagerText.textContent =
-    `村人：${Math.max(0, playerCount - selectedTotal)}人`;
-
-  ONLINE_EXTRA_SETTINGS.forEach(setting => {
-    const row = document.createElement("div");
-    row.className = "online-readonly-row";
-
-    const name = document.createElement("strong");
-    name.textContent = setting.label;
-
-    const value = document.createElement("span");
-    const enabled = settings.extras[setting.key] === true;
-
-    value.textContent = enabled ? "ON" : "OFF";
-    value.className = enabled
-      ? "online-setting-on"
-      : "online-setting-off";
-
-    row.append(name, value);
-    guestExtras.appendChild(row);
-  });
-}
-
-// 自分がホストか参加者かによって表示を切り替える
-function updateOnlineSettingsVisibility() {
-  const guestBox =
-    document.getElementById("online-guest-settings");
-
-  // 役職配布前だけ表示する
-  const inLobby =
-    !document.getElementById("lobby-screen").hidden;
-
-  guestBox.hidden = !inLobby || onlineIsHost;
-
-  roleSettingsBox.hidden = !inLobby || !onlineIsHost;
-}
-
-
-function watchOnlineSettings() {
-  if (stopSettingsListener) {
-    stopSettingsListener();
-    stopSettingsListener = null;
-  }
-
-  const settingsRef = ref(
-    db,
-    `rooms/${currentRoom}/settings`
-  );
-
-  stopSettingsListener = onValue(
-    settingsRef,
-    snapshot => {
-      sharedOnlineSettings = snapshot.val();
-
-      console.log(
-        "設定データを受信：",
-        sharedOnlineSettings
-      );
-
-      // 参加者側の画面を更新
-      if (!onlineIsHost) {
-        renderOnlineGuestSettings(
-          sharedOnlineSettings
-        );
-      }
-    },
-    error => {
-      console.error("設定同期エラー：", error);
-      showStatus(
-        "設定を読み込めませんでした。ページを再読み込みしてください。"
-      );
-    }
-  );
-}
-
-
-
-/* ========================================
-   ルーム作成・参加ボタンの設定
-======================================== */
-
-// 新しいルームを作成
-createButton.addEventListener("click", createRoom);
-
-// 既存のルームに参加
-joinButton.addEventListener("click", joinRoom);
-
-// 招待リンクをコピー
-document.getElementById("copy-room-link")
-  .addEventListener("click", async () => {
-    if (!currentRoom) return;
-
-    const url =
-      `${location.origin}${location.pathname}?room=${currentRoom}`;
-
-    try {
-      await navigator.clipboard.writeText(url);
-      showStatus("招待リンクをコピーしました。");
-    } catch {
-      showStatus("リンクをコピーできませんでした。");
-    }
-  });
-
-// 招待リンクから開いた場合、ルーム番号を自動入力
-const invitedRoom =
-  new URLSearchParams(location.search).get("room");
-
-if (invitedRoom && /^\d{6}$/.test(invitedRoom)) {
-  roomInput.value = invitedRoom;
-  switchOnlineEntryScreen("join");
-}
-
-// ページを離れたときに監視を解除
-
-window.addEventListener("pagehide", () => {
-  if (stopMembersListener) {
-    stopMembersListener();
-  }
-
-  if (stopPhaseListener) {
-    stopPhaseListener();
-  }
-
-  if (stopRoleListener) {
-    stopRoleListener();
-  }
-
-  if (stopReadyListener) {
-    stopReadyListener();
-  }
-
-  if (stopSettingsListener) {
-    stopSettingsListener();
-  }
-
-  // Firebaseの接続監視を終了する
-  if (stopConnectionListener) {
-    stopConnectionListener();
-  }
-  if (stopNightDoneListener) stopNightDoneListener();
-});
-
-
-
-// ========================================
-// 通信切断・再接続への対応
-// ========================================
-
-function watchOnlineConnection() {
-  if (stopConnectionListener) {
-    stopConnectionListener();
-  }
-
-  const connectionRef = ref(
-    db,
-    ".info/connected"
-  );
-
-  stopConnectionListener = onValue(
-    connectionRef,
-    async snapshot => {
-      const connected = snapshot.val() === true;
-
-      if (!connected) {
-        if (connectedOnce) {
-          reconnectNeeded = true;
-          console.log("Firebase接続が切れました");
-        }
-        return;
-      }
-
-      connectedOnce = true;
-
-      // 切断後の再接続だけを処理する
-      if (!reconnectNeeded || reconnecting) return;
-
-      // ゲーム開始後は参加者名簿を変更しない
-      if (currentPhase !== "lobby") return;
-
-      if (!currentRoom || !currentUid) return;
-
-      reconnecting = true;
-
-      try {
-        const name = onlineIsHost
-  ? nameInput.value.trim()
-  : joinNameInput.value.trim();
-
-        await registerMember(
-          currentRoom,
-          name,
-          currentUid
-        );
-
-        reconnectNeeded = false;
-        showStatus("ルームに再接続しました。");
-        console.log("ルームに再入室しました");
-
-      } catch (error) {
-        console.error("再接続エラー：", error);
-
-        showStatus(
-          "ルームへの再接続に失敗しました。再度入室してください。"
-        );
-      } finally {
-        reconnecting = false;
-      }
-    }
-  );
-}
-
-// ========================================
-// ルーム選択画面の切り替え
-// ========================================
-
-const onlineMenuScreen =
-  document.getElementById("online-menu-screen");
-
-const onlineCreateScreen =
-  document.getElementById("online-create-screen");
-
-const onlineJoinScreen =
-  document.getElementById("online-join-screen");
-
-function switchOnlineEntryScreen(screen) {
-  onlineMenuScreen.hidden = screen !== "menu";
-  onlineCreateScreen.hidden = screen !== "create";
-  onlineJoinScreen.hidden = screen !== "join";
-
-  // 画面切り替え時に古いエラーを消す
-  showStatus("");
-}
-
-// 新しいルームを作成
-document.getElementById("open-create-room")
-  .addEventListener("click", () => {
-    switchOnlineEntryScreen("create");
-    nameInput.focus();
-  });
-
-// ルームに参加
-document.getElementById("open-join-room")
-  .addEventListener("click", () => {
-    switchOnlineEntryScreen("join");
-    joinNameInput.focus();
-  });
-
-// 戻るボタン
-document.getElementById("back-from-create")
-  .addEventListener("click", () => {
-    switchOnlineEntryScreen("menu");
-  });
-
-document.getElementById("back-from-join")
-  .addEventListener("click", () => {
-    switchOnlineEntryScreen("menu");
-  });
-
-// ========================================
-// 初夜の行動
-// ========================================
-
-const goNightButton =
-  document.getElementById("online-go-night");
-
-const nightScreen =
-  document.getElementById("online-night-screen");
-
-const nightRole =
-  document.getElementById("online-night-role");
-
-const nightMessage =
-  document.getElementById("online-night-message");
-
-const nightActionArea =
-  document.getElementById("online-night-action-area");
-
-const nightTarget =
-  document.getElementById("online-night-target");
-
-const nightSubmitButton =
-  document.getElementById("online-submit-night");
-
-const nightResult =
-  document.getElementById("online-night-result");
-
-let stopNightRoleListener = null;
-let stopNightMembersListener = null;
-let stopMyNightActionListener = null;
-let myNightRole = null;
-let nightActionSaved = false;
-
-const nightDoneButton = document.getElementById("online-night-done");
-const nightDoneCount = document.getElementById("online-night-done-count");
-const goDayButton = document.getElementById("online-go-day");
-const dayScreen = document.getElementById("online-day-screen");
-const dayMembersBox = document.getElementById("online-day-members");
-let nightDoneByMe = false;
-let stopNightDoneListener = null;
-
-
-
-function updateNightDoneButton() {
-  const needsAction = Object.prototype.hasOwnProperty.call(
-    NIGHT_ACTION_ROLES,
-    myNightRole
-  );
-
-  if (!myNightRole || currentPhase !== "night" || nightDoneByMe) {
-    nightDoneButton.hidden = true;
-    return;
-  }
-
-  if (needsAction && !nightActionSaved) {
-    nightDoneButton.hidden = true;
-    return;
-  }
-
-  nightDoneButton.hidden = needsAction;
-  nightDoneButton.disabled = false;
-  nightDoneButton.textContent = "夜の行動を完了する";
-}
-
-
-
-async function markMyNightDone() {
-  if (!currentRoom || !currentUid || currentPhase !== "night") return;
-  const needsAction = myNightRole in NIGHT_ACTION_ROLES;
-  if (!myNightRole || (needsAction && !nightActionSaved)) return;
-
-  nightDoneButton.disabled = true;
-  try {
-    await set(
-      ref(db, `rooms/${currentRoom}/nightDone/${currentUid}`),
-      true
-    );
-    nightDoneByMe = true;
-    nightDoneButton.hidden = true;
-    nightResult.textContent = "夜の行動を完了しました。";
-  } catch (error) {
-    console.error("夜の完了通知エラー:", error);
-    nightResult.textContent = "完了通知に失敗：" + error.message;
-    nightDoneButton.disabled = false;
-  }
-}
-
-nightDoneButton.addEventListener("click", markMyNightDone);
-
-function watchNightDone() {
-  if (stopNightDoneListener) stopNightDoneListener();
-  stopNightDoneListener = onValue(
-    ref(db, `rooms/${currentRoom}/nightDone`),
-    snapshot => {
-      const done = snapshot.val() || {};
-      nightDoneByMe = done[currentUid] === true;
-      const total = currentMembers.length;
-      const count = currentMembers.filter(
-        ([uid]) => done[uid] === true
-      ).length;
-
-      nightDoneCount.textContent =
-        `夜の行動完了：${count} / ${total}人`;
-      nightDoneButton.disabled = nightDoneByMe;
-      updateNightDoneButton();
-
-      goDayButton.hidden = !onlineIsHost;
-      goDayButton.disabled =
-        !onlineIsHost || total < 3 || count !== total;
-    },
-    error => {
-      console.error("夜の完了状況取得エラー:", error);
-      nightDoneCount.textContent =
-        "完了状況を取得できません：" + error.message;
-    }
-  );
-}
-
-goDayButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "night") return;
-  goDayButton.disabled = true;
-  try {
-    const [membersSnap, doneSnap] = await Promise.all([
-      get(ref(db, `rooms/${currentRoom}/members`)),
-      get(ref(db, `rooms/${currentRoom}/nightDone`))
-    ]);
-    const memberUids = Object.keys(membersSnap.val() || {});
-    const done = doneSnap.val() || {};
-
-    if (
-      memberUids.length < 3 ||
-      !memberUids.every(uid => done[uid] === true)
-    ) {
-      throw new Error("全員の行動が完了していません。");
-    }
-
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/phase`),
-      "day"
-    );
-  } catch (error) {
-    console.error("朝への移行エラー:", error);
-    nightResult.textContent =
-      "朝へ進めません：" + error.message;
-    goDayButton.disabled = false;
-  }
-});
-
-function enterOnlineDay() {
-  entryScreen.hidden = true;
-  lobbyScreen.hidden = true;
-  roleRevealBox.hidden = true;
-  nightScreen.hidden = true;
-  dayScreen.hidden = false;
-  
-discussionScreen.hidden = true;
-startDiscussionButton.hidden = !onlineIsHost;
-startDiscussionButton.disabled = false;
-
-
-  dayMembersBox.replaceChildren();
-  currentMembers.forEach(([uid, member]) => {
-    const row = document.createElement("div");
-    row.className = "online-member";
-
-    const name = document.createElement("strong");
-    name.textContent = member.name;
-
-    const mark = document.createElement("span");
-    mark.textContent =
-      uid === currentHostUid ? "ホスト" :
-      uid === currentUid ? "あなた" : "参加中";
-
-    row.append(name, mark);
-    dayMembersBox.appendChild(row);
-  });
-}
-
-
-const NIGHT_ACTION_ROLES = {
-  "人狼": {
-    description: "襲撃する相手を選んでください。"
-  },
-  "占い師": {
-    description: "占う相手を選んでください。"
-  },
-  "騎士": {
-    description: "護衛する相手を選んでください。"
-  },
-  "怪盗": {
-    description: "役職を交換する相手を選んでください。"
-  }
+$('online-start-game').onclick=async()=>{
+ if(!host()||phase()!=='lobby')return;const s=collectSettings(),err=validateSettings(s);if(err){notification(err);return;}
+ $('online-start-game').disabled=true;
+ try{
+  const ids=Object.keys(members());let pool=[];
+  roleNames.forEach((r,i)=>{for(let j=0;j<s.roleCounts[i];j++)pool.push(r);});
+  while(pool.length<ids.length)pool.push('村人');
+  if(s.extras.roleMissing){const possible=pool.map((r,i)=>r!=='人狼'&&r!=='村人'?i:-1).filter(i=>i>=0);pool[possible[randomIndex(possible.length)]]='村人';}
+  pool=shuffled(pool);const roles={};ids.forEach((id,i)=>roles[id]=pool[i]);
+  await update(roomRef(''),{settings:s,roles,'meta/phase':'firstNight'});
+ }catch(e){notification('開始エラー：'+e.message);$('online-start-game').disabled=false;}
 };
 
-// 初夜へ進むボタンをホストだけに表示
-function updateGoNightButton() {
-  if (!currentRoom || currentPhase !== "firstNight") {
-    goNightButton.hidden = true;
-    return;
-  }
-
-  goNightButton.hidden = !onlineIsHost;
+function renderReveal(){setView('online-role-reveal');const r=myRole();$('online-my-role').textContent=r||'確認中';
+ const details={人狼:'毎晩1人を襲撃する。',狂人:'人狼陣営の味方。',占い師:'毎晩1人を占う。',騎士:'毎晩1人を護衛する。',霊媒師:'前の処刑者が人狼か調べる。',てるてる:'昼に処刑されると単独勝利。',怪盗:'初夜に他人と役職を交換できる。',村人:'議論と投票で人狼を見つける。'};
+ $('online-my-role-description').textContent=details[r]||'';
+ const ready=data.ready||{};const total=Object.keys(members()).length;const count=Object.values(ready).filter(Boolean).length;
+ $('online-ready-count').textContent=`役職確認済み：${count} / ${total}人`;
+ const b=$('online-ready-button');b.disabled=ready[uid]===true;b.textContent=b.disabled?'確認完了':'役職を確認しました';
+ const go=$('online-go-night');go.hidden=!host();go.disabled=count!==total;
+ if(r==='狂人'&&setting('madmanKnowsWolves')){
+  const wolves=Object.keys(data.roles||{}).filter(id=>data.roles[id]==='人狼').map(nameOf);
+  $('online-my-role-description').textContent+=' 人狼：'+wolves.join('、');
+ }
+ if(r==='人狼'){$('online-my-role-description').textContent+=' 仲間：'+Object.keys(data.roles||{}).filter(id=>id!==uid&&data.roles[id]==='人狼').map(nameOf).join('、');}
 }
+$('online-ready-button').onclick=()=>set(roomRef(`ready/${uid}`),true).catch(e=>notification(e.message));
+$('online-go-night').onclick=()=>{if(host()&&Object.keys(members()).every(id=>data.ready?.[id]===true))set(roomRef('meta/phase'),'night').catch(e=>notification(e.message));};
 
-// ホストが全員の確認完了をチェックして初夜へ進める
-goNightButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "firstNight") {
-    return;
-  }
-
-  goNightButton.disabled = true;
-
-  try {
-    const [membersSnap, readySnap] = await Promise.all([
-      get(ref(db, `rooms/${currentRoom}/members`)),
-      get(ref(db, `rooms/${currentRoom}/ready`))
-    ]);
-
-    const memberUids = Object.keys(
-      membersSnap.val() || {}
-    );
-
-    const ready = readySnap.val() || {};
-
-    if (
-      memberUids.length < 3 ||
-      !memberUids.every(uid => ready[uid] === true)
-    ) {
-      showStatus(
-        "全員が役職を確認するまで進めません。"
-      );
-      return;
-    }
-
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/phase`),
-      "night"
-    );
-
-    showStatus("初夜を開始しました。");
-
-  } catch (error) {
-    console.error("初夜への移行エラー：", error);
-    showStatus("初夜を開始できませんでした。");
-  } finally {
-    if (currentPhase === "firstNight") {
-      goNightButton.disabled = false;
-    }
-  }
-});
-
-// プレイヤーの役職に応じた画面を表示
-function renderNightRole(role) {
-  myNightRole = role;
-  updateNightDoneButton();
-  nightRole.textContent = `あなたの役職：${role}`;
-
-  const action = NIGHT_ACTION_ROLES[role];
-
-  if (!action) {
-    nightActionArea.hidden = true;
-    nightMessage.textContent =
-      "初夜に選択する行動はありません。";
-    nightResult.textContent =
-      "ほかのプレイヤーの行動を待っています。";
-    return;
-  }
-
-  nightMessage.textContent = action.description;
-  nightActionArea.hidden = nightActionSaved;
-  nightSubmitButton.disabled = false;
-  updateNightDoneButton();
+function nightTargets(){const r=myRole();let ids=alive();if(r!=='騎士')ids=ids.filter(id=>id!==uid);
+ if(r==='人狼')ids=ids.filter(id=>data.roles?.[id]!=='人狼');
+ if(r==='騎士'&&!setting('allowConsecutiveGuard')&&round()>2){const prev=data.rounds?.[round()-1]?.nightActions?.[uid]?.targetUid;ids=ids.filter(id=>id!==prev);}
+ if(r==='占い師'){
+  for(let i=1;i<round();i++){const prev=data.rounds?.[i]?.nightActions?.[uid]?.targetUid; if(prev)ids=ids.filter(id=>id!==prev);}
+ }
+ return ids;
 }
-
-// 選択可能な参加者を表示する
-function watchNightTargets() {
-  if (stopNightMembersListener) {
-    stopNightMembersListener();
-  }
-
-  stopNightMembersListener = onValue(
-    ref(db, `rooms/${currentRoom}/members`),
-    snapshot => {
-      const members = snapshot.val() || {};
-      const previousValue = nightTarget.value;
-
-      nightTarget.replaceChildren();
-
-      const placeholder =
-        document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent =
-        "相手を選択してください";
-
-      nightTarget.appendChild(placeholder);
-
-      Object.entries(members).forEach(([uid, member]) => {
-        // 初夜では自分自身を選べない
-        if (uid === currentUid) return;
-
-        const option =
-          document.createElement("option");
-        option.value = uid;
-        option.textContent = member.name;
-
-        nightTarget.appendChild(option);
-      });
-
-      if (
-        [...nightTarget.options].some(
-          option => option.value === previousValue
-        )
-      ) {
-        nightTarget.value = previousValue;
-      }
-    },
-    error => {
-      console.error("対象者一覧の取得エラー：", error);
-      nightResult.textContent =
-        "対象者一覧を読み込めませんでした。";
-    }
-  );
+function renderNight(){setView('online-night-screen');$('online-night-title').textContent=round()===1?'初夜':`${round()}日目の夜`;
+ const r=myRole(),rn=thisRound(),done=rn.nightDone||{},act=rn.nightActions?.[uid];const needs=living(uid)&&needsNightAction(r,round());
+ $('online-night-role').textContent=living(uid)?`あなたの役職：${r}`:'あなたは脱落しています';
+ let msg='夜の行動を終えてください。';
+ if(!living(uid))msg='あなたは脱落しています。生存者の夜明けを待ちます。';
+ else if(r==='人狼')msg='襲撃する相手を選んでください。';
+ else if(r==='占い師')msg='占う相手を選んでください。';
+ else if(r==='騎士')msg='護衛する相手を選んでください。自分も護衛できます。';
+ else if(r==='怪盗'&&round()===1)msg='交換する相手を選ぶか、交換せずに終了してください。';
+ else if(r==='霊媒師'&&round()>1){const prev=data.rounds?.[round()-1]?.voteResult?.targetUid;msg=prev?`前日処刑された${nameOf(prev)}は、${getMediumResult(data.roles,prev)}です。`:'昨日は処刑者がいませんでした。';}
+ $('online-night-message').textContent=msg;
+ const targets=nightTargets();opt($('online-night-target'),targets);
+ const actionArea=$('online-night-action-area');actionArea.hidden=!needs||!!done[uid]||!!act;
+ $('online-night-target').disabled=targets.length===0;
+ $('online-submit-night').disabled=targets.length===0;
+ $('online-night-skip').hidden=!(r==='怪盗'&&round()===1&&living(uid)&&!done[uid]&&!act) && !(needs&&targets.length===0&&!act&&!done[uid]);
+ $('online-night-done').hidden=!living(uid)||!!done[uid]||needs&&!act;
+ $('online-night-result').textContent=done[uid]?'完了しました。他の参加者を待っています。':act?'行動を送信しました。':' ';
+ const status=countCompleted(done,alive());$('online-night-done-count').textContent=`夜の行動完了：${status.completed} / ${status.total}人`;
+ $('online-go-day').hidden=!host();$('online-go-day').disabled=!status.allDone;
 }
-
-// 自分の保存済み行動のみを監視
-function watchMyNightAction() {
-  if (stopMyNightActionListener) {
-    stopMyNightActionListener();
-  }
-
-  stopMyNightActionListener = onValue(
-    ref(
-      db,
-      `rooms/${currentRoom}/nightActions/${currentUid}`
-    ),
-    snapshot => {
-      nightActionSaved = snapshot.exists();
-      updateNightDoneButton();
-
-      if (nightActionSaved) {
-        nightActionArea.hidden = true;
-        nightResult.textContent =
-          "行動を確定しました。ほかの参加者を待っています。";
-      } else if (myNightRole in NIGHT_ACTION_ROLES) {
-        nightActionArea.hidden = false;
-      }
-    },
-    error => {
-      console.error("行動状態の取得エラー：", error);
-      nightResult.textContent =
-        "行動の状態を確認できませんでした。";
-    }
-  );
-}
-
-// 初夜画面へ切り替え
-function enterOnlineNight() {
-  entryScreen.hidden = true;
-  lobbyScreen.hidden = true;
-  roleRevealBox.hidden = true;
-  nightScreen.hidden = false;
-  dayScreen.hidden = true;
-nightDoneButton.hidden = true;
-goDayButton.hidden = !onlineIsHost;
-watchNightDone();
-
-  nightResult.textContent = "役職を確認しています…";
-  nightActionArea.hidden = true;
-
-  if (stopNightRoleListener) {
-    stopNightRoleListener();
-  }
-
-  stopNightRoleListener = onValue(
-    ref(db, `rooms/${currentRoom}/roles/${currentUid}`),
-    snapshot => {
-      if (snapshot.exists()) {
-        renderNightRole(snapshot.val());
-      }
-    },
-    error => {
-      console.error("初夜の役職取得エラー：", error);
-      nightResult.textContent =
-        "役職を読み込めませんでした。";
-    }
-  );
-
-  watchNightTargets();
-  watchMyNightAction();
-}
-
-// 行動を確定してFirebaseへ保存
-nightSubmitButton.addEventListener("click", async () => {
-  if (
-    currentPhase !== "night" ||
-    !myNightRole ||
-    !(myNightRole in NIGHT_ACTION_ROLES)
-  ) {
-    return;
-  }
-
-  const targetUid = nightTarget.value;
-
-  if (!targetUid || targetUid === currentUid) {
-    nightResult.textContent =
-      "行動する相手を選択してください。";
-    return;
-  }
-
-  nightSubmitButton.disabled = true;
-  nightResult.textContent = "行動を保存しています…";
-
-  try {
-    await set(
-      ref(
-        db,
-        `rooms/${currentRoom}/nightActions/${currentUid}`
-      ),
-      {
-        targetUid,
-        role: myNightRole
-      }
-    );
-
-
-nightActionSaved = true;
-nightActionArea.hidden = true;
-nightResult.textContent = "行動を保存しました。完了処理中…";
-updateNightDoneButton();
-
-try {
-  await set(
-    ref(db, `rooms/${currentRoom}/nightDone/${currentUid}`),
-    true
-  );
-  nightDoneByMe = true;
-  nightDoneButton.hidden = true;
-  nightDoneButton.disabled = true;
-  nightResult.textContent =
-    "夜の行動を確定しました。ほかの参加者を待っています。";
-} catch (doneError) {
-  console.error("夜の完了通知エラー:", doneError);
-  nightResult.textContent =
-    "行動は保存されましたが、完了通知に失敗しました。下の完了ボタンを押してください。";
-  nightDoneButton.hidden = false;
-  nightDoneButton.disabled = false;
-}
-
-
-  } catch (error) {
-    console.error("初夜の行動保存エラー：", error);
-    nightResult.textContent =
-      "行動を保存できませんでした。もう一度お試しください。";
-    nightSubmitButton.disabled = false;
-  }
-});
-
-
-const startDiscussionButton = document.getElementById("online-start-discussion");
-const discussionScreen = document.getElementById("online-discussion-screen");
-const discussionTimer = document.getElementById("online-discussion-timer");
-const discussionMessage = document.getElementById("online-discussion-message");
-const discussionMembers = document.getElementById("online-discussion-members");
-const discussionControlsBox = document.getElementById("online-discussion-controls");
-const addMinuteButton = document.getElementById("online-add-minute");
-const pauseDiscussionButton = document.getElementById("online-pause-discussion");
-
-const DISCUSSION_DURATION = 3 * 60 * 1000;
-let discussionInterval = null;
-let discussionStartedAt = null;
-let discussionControlData = {
-  paused: false,
-  pausedAt: 0,
-  pausedMs: 0,
-  extraMs: 0
+$('online-submit-night').onclick=async()=>{
+ if(!living(uid)||phase()!=='night')return;const r=myRole(),target=$('online-night-target').value;if(!nightTargets().includes(target))return notification('相手を選択してください。');
+ try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:r,targetUid:target,at:Date.now()});await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('夜の送信：'+e.message);}
 };
-let stopDiscussionControlsListener = null;
-let stopServerOffsetListener = null;
-let serverTimeOffset = 0;
-
-function getDiscussionNow() {
-  return Date.now() + serverTimeOffset;
+$('online-night-done').onclick=async()=>{if(!living(uid)||needsNightAction(myRole(),round())&&!thisRound().nightActions?.[uid])return;try{await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('完了通知：'+e.message);}};
+$('online-night-skip').onclick=async()=>{if(!living(uid))return;try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:myRole(),targetUid:'',skip:true,at:Date.now()});await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('行動スキップ：'+e.message);}};
+async function resolveMorning(){
+ if(!host()||phase()!=='night')return;const r=round(),state=thisRound();if(!countCompleted(state.nightDone||{},alive()).allDone)return notification('生存者の夜の完了を待っています。');
+ const original=data.roles||{},actions=state.nightActions||{};
+ const privateResults={},patch={};let roles={...original};
+ for(const [id,role] of Object.entries(original)){
+  if(role==='占い師'&&living(id)&&actions[id]?.targetUid)privateResults[id]={type:'seer',text:`${nameOf(actions[id].targetUid)}は「${getSeerResult(original,actions[id].targetUid)}」です。`};
+ }
+ if(r===1){const thief=Object.keys(original).find(id=>original[id]==='怪盗');const target=actions[thief]?.targetUid;
+  if(thief&&target&&living(thief)&&living(target)){
+   const swapped=applyThiefSwap(original,thief,target);roles=swapped.roles;
+   privateResults[thief]={type:'thief',text:`交換した役職：${swapped.stolenRole}。${nameOf(target)}と交換しました。`};
+   privateResults[target]={type:'stolen',text:'怪盗に役職を交換されました。現在の役職は怪盗です。'};
+  }
+ }
+ const order=Object.entries(actions).filter(([id,a])=>original[id]==='人狼'&&a?.targetUid).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([id])=>id);
+ const night=resolveNight(r,roles,actions,data.eliminated||{},order);
+ const eventOptions=setting('randomEvents')?['緊急会議：議論は2分','延長会議：議論は5分','平穏な朝：議論は3分']:['議論は3分'];
+ const roll=Math.random();const event=setting('randomEvents')?(roll<0.2?0:roll<0.4?1:2):0;
+ const minutes=event===0&&setting('randomEvents')?2:event===1&&setting('randomEvents')?5:3;
+ patch[roundField('nightResult',r)]={victimUid:night.victimUid||'',guarded:night.guarded,eventText:eventOptions[event],minutes};
+ patch[roundField('privateResults',r)]=privateResults;
+ if(r===1)patch.roles=roles;
+ if(night.victimUid)patch[`eliminated/${night.victimUid}`]=true;
+ if(night.winner){patch['meta/winner']=night.winner;patch['meta/phase']='gameOver';}
+ else patch['meta/phase']='day';
+ await update(roomRef(''),patch);
 }
+$('online-go-day').onclick=async()=>{try{$('online-go-day').disabled=true;await resolveMorning();}catch(e){notification('朝への移行：'+e.message);$('online-go-day').disabled=false;}};
 
-function renderDiscussionMembers() {
-  discussionMembers.replaceChildren();
-  currentMembers.forEach(([uid, member]) => {
-    const row = document.createElement("div");
-    row.className = "online-member";
-    const name = document.createElement("strong");
-    name.textContent = member.name;
-    const mark = document.createElement("span");
-    mark.textContent =
-      uid === currentHostUid ? "ホスト" :
-      uid === currentUid ? "あなた" : "参加中";
-    row.append(name, mark);
-    discussionMembers.appendChild(row);
-  });
+function renderDay(){setView('online-day-screen');$('online-day-title').textContent=`${round()}日目の朝`;const result=thisRound().nightResult;
+ $('online-day-notice').textContent=result?.victimUid?`${nameOf(result.victimUid)}が襲撃されました。`: '昨夜の犠牲者はいませんでした。';
+ $('online-day-notice').textContent+=' '+(result?.eventText||'');
+ const personal=thisRound().privateResults?.[uid]?.text;
+ $('online-private-result').textContent=personal||'';
+ renderList($('online-day-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
+ $('online-start-discussion').hidden=!host();
 }
-
-function updateDiscussionTimer() {
-  if (!Number.isFinite(discussionStartedAt) || discussionStartedAt <= 0) {
-    discussionTimer.textContent = "--:--";
-    return;
-  }
-
-  const now = getDiscussionNow();
-  const state = discussionControlData;
-  const referenceNow = state.paused ? state.pausedAt : now;
-  const elapsed = Math.max(
-    0,
-    referenceNow - discussionStartedAt - state.pausedMs
-  );
-  const remaining = Math.max(
-    0,
-    DISCUSSION_DURATION + state.extraMs - elapsed
-  );
-
-  const seconds = Math.ceil(remaining / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const leftover = seconds % 60;
-
-  discussionTimer.textContent =
-    String(minutes).padStart(2, "0") + ":" +
-    String(leftover).padStart(2, "0");
-
-  discussionControlsBox.hidden = !onlineIsHost;
-  pauseDiscussionButton.textContent =
-    state.paused ? "再開する" : "一時停止";
-  pauseDiscussionButton.disabled = remaining === 0 && !state.paused;
-
-  if (state.paused) {
-    discussionMessage.textContent = "議論を一時停止しています。";
-  } else if (remaining === 0) {
-    discussionMessage.textContent = "議論時間が終了しました。";
-  } else {
-    discussionMessage.textContent = "議論中です。";
-  }
+$('online-start-discussion').onclick=async()=>{if(!host()||phase()!=='day')return;try{await update(roomRef(''),{[`rounds/${round()}/discussionStartedAt`]:Date.now(),[`rounds/${round()}/discussionTimerControls`]:{paused:false,pausedAt:0,pausedMs:0,extraMs:0},'meta/phase':'discussion'});}catch(e){notification('議論開始：'+e.message);}};
+function discussionLeft(){const r=thisRound(),base=(r.nightResult?.minutes||3)*60000,c=r.discussionTimerControls||{};const now=c.paused?c.pausedAt||Date.now():Date.now();const elapsed=Math.max(0,now-(r.discussionStartedAt||now)-(c.pausedMs||0));return Math.max(0,base+(c.extraMs||0)-elapsed);}
+function renderTimer(){if(phase()!=='discussion')return;const sec=Math.ceil(discussionLeft()/1000);$('online-discussion-timer').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;}
+function renderDiscussion(){setView('online-discussion-screen');renderList($('online-discussion-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
+ $('online-discussion-controls').hidden=!host();$('online-start-vote').hidden=!host();$('online-skip-vote').hidden=!host();const ctrl=thisRound().discussionTimerControls||{};$('online-pause-discussion').textContent=ctrl.paused?'再開':'一時停止';
+ renderTimer();if(!timer)timer=setInterval(renderTimer,500);
 }
-
-function enterOnlineDiscussion(meta) {
-  entryScreen.hidden = true;
-  lobbyScreen.hidden = true;
-  roleRevealBox.hidden = true;
-  nightScreen.hidden = true;
-  dayScreen.hidden = true;
-  discussionScreen.hidden = false;
-
-voteScreen.hidden = true;
-voteResultScreen.hidden = true;
-startVoteButton.hidden = !onlineIsHost;
-startVoteButton.disabled = false;
-
-  renderDiscussionMembers();
-  discussionStartedAt = Number(meta.discussionStartedAt) || null;
-  discussionControlsBox.hidden = !onlineIsHost;
-
-  if (discussionInterval !== null) {
-    clearInterval(discussionInterval);
-  }
-
-  if (stopDiscussionControlsListener) {
-    stopDiscussionControlsListener();
-  }
-
-  stopDiscussionControlsListener = onValue(
-    ref(db, `rooms/${currentRoom}/discussionTimerControls`),
-    snapshot => {
-      discussionControlData = snapshot.val() || {
-        paused: false,
-        pausedAt: 0,
-        pausedMs: 0,
-        extraMs: 0
-      };
-      updateDiscussionTimer();
-    },
-    error => {
-      console.error("タイマー同期エラー:", error);
-      discussionMessage.textContent =
-        "タイマーの同期に失敗しました：" + error.message;
-    }
-  );
-
-  updateDiscussionTimer();
-  discussionInterval = setInterval(updateDiscussionTimer, 1000);
+$('online-add-minute').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{};await update(roomRef(roundField('discussionTimerControls')),{extraMs:(c.extraMs||0)+60000});}catch(e){notification('時間追加：'+e.message);}};
+$('online-pause-discussion').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{},now=Date.now();await update(roomRef(roundField('discussionTimerControls')),{paused:!c.paused,pausedAt:!c.paused?now:0,pausedMs:(c.pausedMs||0)+(c.paused?Math.max(0,now-(c.pausedAt||now)):0)});}catch(e){notification('一時停止：'+e.message);}};
+async function startVoting(){if(!host()||phase()!=='discussion')return;await update(roomRef(''),{[roundField('voteState')]:{index:1,candidates:Object.fromEntries(alive().map(id=>[id,true]))},'meta/phase':'voting'});}
+$('online-start-vote').onclick=()=>startVoting().catch(e=>notification('投票開始：'+e.message));
+$('online-skip-vote').onclick=async()=>{if(!host()||phase()!=='discussion')return;try{await finishResult({counts:{},tie:true,targetUid:'',skipped:true});}catch(e){notification('スキップ：'+e.message);}};
+function renderVoting(){setView('online-vote-screen');const v=thisRound().voteState||{},index=v.index||1,candidates=Object.keys(v.candidates||{}).filter(id=>v.candidates[id]);const vote=thisRound().votes?.[index]?.[uid];const done=thisRound().voteReady?.[index]||{};
+ $('online-vote-title').textContent=index===1?'昼の投票':`再投票（${index}回目）`;
+ opt($('online-vote-target'),candidates.filter(id=>id!==uid&&living(id)),'投票する相手を選択');
+ $('online-submit-vote').disabled=!living(uid)||!!vote;
+ $('online-vote-target').disabled=!living(uid)||!!vote;
+ $('online-vote-message').textContent=!living(uid)?'脱落者は投票できません。':vote?'投票済みです。':index>1?'最多得票の候補者だけに再投票します。':'投票先を選択してください。';
+ const status=countCompleted(done,alive());$('online-vote-count').textContent=`投票完了：${status.completed} / ${status.total}人`;
+ $('online-finish-vote').hidden=!host();$('online-finish-vote').disabled=!status.allDone;
 }
-
-startDiscussionButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "day") return;
-  startDiscussionButton.disabled = true;
-  try {
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/discussionStartedAt`),
-      serverTimestamp()
-    );
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/phase`),
-      "discussion"
-    );
-  } catch (error) {
-    console.error("議論開始エラー:", error);
-    showStatus("議論を開始できません：" + error.message);
-    startDiscussionButton.disabled = false;
-  }
-});
-
-addMinuteButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "discussion") return;
-  addMinuteButton.disabled = true;
-  try {
-    await runTransaction(
-      ref(db, `rooms/${currentRoom}/discussionTimerControls`),
-      current => {
-        const state = current || {
-          paused: false,
-          pausedAt: 0,
-          pausedMs: 0,
-          extraMs: 0
-        };
-        return {
-          ...state,
-          extraMs: state.extraMs + 60000
-        };
-      }
-    );
-  } catch (error) {
-    console.error("時間追加エラー:", error);
-    discussionMessage.textContent =
-      "時間を追加できません：" + error.message;
-  } finally {
-    addMinuteButton.disabled = false;
-  }
-});
-
-pauseDiscussionButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "discussion") return;
-  pauseDiscussionButton.disabled = true;
-  try {
-    const result = await runTransaction(
-      ref(db, `rooms/${currentRoom}/discussionTimerControls`),
-      current => {
-        const state = current || {
-          paused: false,
-          pausedAt: 0,
-          pausedMs: 0,
-          extraMs: 0
-        };
-        const now = getDiscussionNow();
-
-        if (state.paused) {
-          return {
-            ...state,
-            paused: false,
-            pausedAt: 0,
-            pausedMs: state.pausedMs + Math.max(0, now - state.pausedAt)
-          };
-        }
-
-        return {
-          ...state,
-          paused: true,
-          pausedAt: now
-        };
-      }
-    );
-    if (!result.committed) {
-      throw new Error("タイマーの更新が確定されませんでした。");
-    }
-  } catch (error) {
-    console.error("一時停止エラー:", error);
-    discussionMessage.textContent =
-      "一時停止を切り替えられません：" + error.message;
-  } finally {
-    pauseDiscussionButton.disabled = false;
-  }
-});
-
-stopServerOffsetListener = onValue(
-  ref(db, ".info/serverTimeOffset"),
-  snapshot => {
-    serverTimeOffset = Number(snapshot.val()) || 0;
-  }
-);
-
-window.addEventListener("pagehide", () => {
-  if (discussionInterval !== null) {
-    clearInterval(discussionInterval);
-  }
-  if (stopDiscussionControlsListener) {
-    stopDiscussionControlsListener();
-  }
-  if (stopServerOffsetListener) {
-    stopServerOffsetListener();
-  }
-});
-
-
-/* ========================================
-   昼の投票・集計・処刑結果
-======================================== */
-
-const startVoteButton = document.getElementById("online-start-vote");
-const voteScreen = document.getElementById("online-vote-screen");
-const voteTarget = document.getElementById("online-vote-target");
-const submitVoteButton = document.getElementById("online-submit-vote");
-const voteMessage = document.getElementById("online-vote-message");
-const voteCount = document.getElementById("online-vote-count");
-const finishVoteButton = document.getElementById("online-finish-vote");
-const voteResultScreen = document.getElementById("online-vote-result-screen");
-const voteResults = document.getElementById("online-vote-results");
-const executionResult = document.getElementById("online-execution-result");
-
-let stopVoteReadyListener = null;
-let stopMyVoteListener = null;
-let stopVoteResultListener = null;
-let myVoteSubmitted = false;
-let votingMembers = [];
-
-function getVotingName(uid) {
-  const found = currentMembers.find(([id]) => id === uid);
-  return found ? found[1].name : "不明なプレイヤー";
+$('online-submit-vote').onclick=async()=>{if(!living(uid)||phase()!=='voting')return;const v=thisRound().voteState,index=v?.index||1,target=$('online-vote-target').value;if(!target||target===uid||!v.candidates?.[target])return notification('投票先を選択してください。');
+ try{await set(roomRef(roundField(`votes/${index}/${uid}`)),target);await set(roomRef(roundField(`voteReady/${index}/${uid}`)),true);}catch(e){notification('投票保存：'+e.message);}};
+async function finishResult(result){
+ const patch={[roundField('voteResult')]:result};let winner=null;
+ if(result.targetUid){const execution=resolveExecution(data.roles,result.targetUid,data.eliminated||{});patch[`eliminated/${result.targetUid}`]=true;winner=execution.winner;}
+ else winner=checkGameWinner(data.roles,data.eliminated||{});
+ if(winner){patch['meta/winner']=winner;patch['meta/phase']='gameOver';}
+ else patch['meta/phase']='voteResult';
+ await update(roomRef(''),patch);
 }
-
-function renderVoteTargets() {
-  voteTarget.replaceChildren();
-
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "プレイヤーを選択";
-  voteTarget.appendChild(placeholder);
-
-  votingMembers.forEach(([uid, member]) => {
-    if (uid === currentUid) return;
-
-    const option = document.createElement("option");
-    option.value = uid;
-    option.textContent = member.name;
-    voteTarget.appendChild(option);
-  });
+$('online-finish-vote').onclick=async()=>{if(!host()||phase()!=='voting')return;
+ try{const v=thisRound().voteState,index=v?.index||1,voters=alive(),done=thisRound().voteReady?.[index]||{};if(!countCompleted(done,voters).allDone)throw Error('全員の投票が未完了です。');
+  const candidates=Object.keys(v.candidates||{}).filter(id=>v.candidates[id]),votes=thisRound().votes?.[index]||{};
+  const res=calculateVotes(votes,voters,candidates);
+  if(res.tie&&index===1){await set(roomRef(roundField('voteState')),{index:2,candidates:Object.fromEntries(res.candidates.map(id=>[id,true]))});return;}
+  await finishResult({counts:res.counts,tie:res.tie,targetUid:res.executedUid||'',voteIndex:index});
+ }catch(e){notification('投票集計：'+e.message);}
+};
+function renderVoteResult(){setView('online-vote-result-screen');const result=thisRound().voteResult||{};
+ renderList($('online-vote-results'),Object.entries(result.counts||{}).sort((a,b)=>b[1]-a[1]).map(([id,num])=>[nameOf(id),`${num}票`]));
+ $('online-execution-result').textContent=result.targetUid?`${nameOf(result.targetUid)}が処刑されました。`:result.skipped?'投票をスキップしました。':'再投票も同票のため、処刑者はいません。';
+ if(setting('publicVotes')){
+  const idx=result.voteIndex||1,all=thisRound().votes?.[idx]||{};
+  $('online-public-votes-result').textContent=Object.entries(all).map(([from,to])=>`${nameOf(from)} → ${nameOf(to)}`).join(' / ');
+ }else $('online-public-votes-result').textContent='';
+ renderList($('online-alive-members'),alive().map(id=>[nameOf(id),'生存']));
+ renderList($('online-eliminated-members'),Object.keys(members()).filter(id=>!living(id)).map(id=>[nameOf(id),'脱落']));
+ $('online-my-survival-status').textContent=living(uid)?'あなたは生存しています。':'あなたは脱落しています。';
+ $('online-next-night').hidden=!host();$('online-next-night').textContent=`${round()+1}日目の夜へ進む`;
 }
-
-function enterOnlineVoting() {
-  entryScreen.hidden = true;
-  lobbyScreen.hidden = true;
-  roleRevealBox.hidden = true;
-  nightScreen.hidden = true;
-  dayScreen.hidden = true;
-  discussionScreen.hidden = true;
-  voteResultScreen.hidden = true;
-  voteScreen.hidden = false;
-
-  if (discussionInterval !== null) {
-    clearInterval(discussionInterval);
-    discussionInterval = null;
-  }
-  if (stopDiscussionControlsListener) {
-    stopDiscussionControlsListener();
-    stopDiscussionControlsListener = null;
-  }
-
-  votingMembers = [...currentMembers];
-  renderVoteTargets();
-
-  finishVoteButton.hidden = !onlineIsHost;
-  finishVoteButton.disabled = true;
-  voteMessage.textContent = "投票先を選択してください。";
-
-  if (stopMyVoteListener) stopMyVoteListener();
-
-  stopMyVoteListener = onValue(
-    ref(db, `rooms/${currentRoom}/votes/${currentUid}`),
-    snapshot => {
-      myVoteSubmitted = snapshot.exists();
-      if (myVoteSubmitted) {
-        voteTarget.disabled = true;
-        submitVoteButton.disabled = true;
-        submitVoteButton.textContent = "投票済み";
-        voteMessage.textContent = "投票しました。集計を待っています。";
-      } else {
-        voteTarget.disabled = false;
-        submitVoteButton.disabled = false;
-        submitVoteButton.textContent = "投票を確定する";
-      }
-    },
-    error => {
-      console.error("自分の投票確認エラー:", error);
-      voteMessage.textContent = "投票状況の取得エラー：" + error.message;
-    }
-  );
-
-  if (stopVoteReadyListener) stopVoteReadyListener();
-
-  stopVoteReadyListener = onValue(
-    ref(db, `rooms/${currentRoom}/voteReady`),
-    snapshot => {
-      const ready = snapshot.val() || {};
-      const total = votingMembers.length;
-      const count = votingMembers.filter(
-        ([uid]) => ready[uid] === true
-      ).length;
-
-      voteCount.textContent = `投票完了：${count} / ${total}人`;
-      finishVoteButton.disabled =
-        !onlineIsHost || total < 3 || count !== total;
-    },
-    error => {
-      console.error("投票完了状況エラー:", error);
-      voteCount.textContent = "投票状況を取得できません。";
-    }
-  );
+$('online-next-night').onclick=async()=>{if(!host()||phase()!=='voteResult')return;try{await update(roomRef(''),{'meta/round':round()+1,'meta/phase':'night'});}catch(e){notification('次の日への移行：'+e.message);}};
+function renderGameOver(){setView('online-game-over-screen');$('online-winner').textContent=`勝利：${data.meta.winner||'判定待ち'}`;
+ const original=Object.entries(members()).map(([id,m])=>[m.name,`${data.roles?.[id]||'不明'} / ${living(id)?'生存':'脱落'}`]);
+ renderList($('online-final-roles'),original);
+ const history=[];for(let i=1;i<=round();i++){const r=data.rounds?.[i]||{};if(r.nightResult)history.push([`${i}日目・朝`,r.nightResult.victimUid?`${nameOf(r.nightResult.victimUid)}が襲撃`:'犠牲者なし']);if(r.voteResult)history.push([`${i}日目・投票`,r.voteResult.targetUid?`${nameOf(r.voteResult.targetUid)}が処刑`:'処刑者なし']);}
+ renderList($('online-game-history'),history);
 }
-
-startVoteButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "discussion") return;
-
-  startVoteButton.disabled = true;
-  try {
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/phase`),
-      "voting"
-    );
-  } catch (error) {
-    console.error("投票開始エラー:", error);
-    showStatus("投票を開始できません：" + error.message);
-    startVoteButton.disabled = false;
-  }
-});
-
-submitVoteButton.addEventListener("click", async () => {
-  if (currentPhase !== "voting" || myVoteSubmitted) return;
-
-  const targetUid = voteTarget.value;
-  if (!targetUid || targetUid === currentUid) {
-    voteMessage.textContent = "自分以外の投票先を選択してください。";
-    return;
-  }
-
-  submitVoteButton.disabled = true;
-  voteTarget.disabled = true;
-  voteMessage.textContent = "投票を保存しています…";
-
-  try {
-    const myVoteRef = ref(
-      db, `rooms/${currentRoom}/votes/${currentUid}`
-    );
-
-    const existing = await get(myVoteRef);
-
-    if (existing.exists()) {
-      if (existing.val() !== targetUid) {
-        throw new Error("投票先は変更できません。");
-      }
-    } else {
-      await set(myVoteRef, targetUid);
-    }
-
-    await set(
-      ref(db, `rooms/${currentRoom}/voteReady/${currentUid}`),
-      true
-    );
-
-    myVoteSubmitted = true;
-    submitVoteButton.textContent = "投票済み";
-    voteMessage.textContent = "投票しました。集計を待っています。";
-  } catch (error) {
-    console.error("投票保存エラー:", error);
-    voteMessage.textContent = "投票エラー：" + error.message;
-    submitVoteButton.disabled = false;
-    voteTarget.disabled = false;
-  }
-});
-
-finishVoteButton.addEventListener("click", async () => {
-  if (!onlineIsHost || currentPhase !== "voting") return;
-
-  finishVoteButton.disabled = true;
-
-  try {
-    const [membersSnap, votesSnap] = await Promise.all([
-      get(ref(db, `rooms/${currentRoom}/members`)),
-      get(ref(db, `rooms/${currentRoom}/votes`))
-    ]);
-
-    const members = membersSnap.val() || {};
-    const votes = votesSnap.val() || {};
-    const uids = Object.keys(members);
-
-    if (uids.length < 3 || !uids.every(uid => votes[uid])) {
-      throw new Error("まだ全員の投票が終わっていません。");
-    }
-
-    const counts = {};
-    uids.forEach(uid => { counts[uid] = 0; });
-
-    uids.forEach(uid => {
-      const targetUid = votes[uid];
-      if (targetUid === uid || !(targetUid in members)) {
-        throw new Error("不正な投票先があります。");
-      }
-      counts[targetUid]++;
-    });
-
-    const maxVotes = Math.max(...Object.values(counts));
-    const topPlayers = Object.keys(counts).filter(
-      uid => counts[uid] === maxVotes
-    );
-
-    const tie = topPlayers.length > 1;
-    const targetUid = tie ? "" : topPlayers[0];
-
-    await set(
-      ref(db, `rooms/${currentRoom}/voteResult`),
-      { counts, tie, targetUid }
-    );
-
-    if (!tie) {
-      await set(
-        ref(db, `rooms/${currentRoom}/eliminated/${targetUid}`),
-        true
-      );
-    }
-
-    await set(
-      ref(db, `rooms/${currentRoom}/meta/phase`),
-      "voteResult"
-    );
-  } catch (error) {
-    console.error("投票集計エラー:", error);
-    voteMessage.textContent = "集計エラー：" + error.message;
-    finishVoteButton.disabled = false;
-  }
-});
-
-function renderOnlineVoteResult(result) {
-  voteResults.replaceChildren();
-
-  const counts = result.counts || {};
-  const sorted = Object.entries(counts).sort(
-    (a, b) => b[1] - a[1]
-  );
-
-  sorted.forEach(([uid, count]) => {
-    const row = document.createElement("div");
-    row.className = "online-member";
-
-    const name = document.createElement("strong");
-    name.textContent = getVotingName(uid);
-
-    const votes = document.createElement("span");
-    votes.textContent = `${count}票`;
-
-    row.append(name, votes);
-    voteResults.appendChild(row);
-  });
-
-  if (result.tie) {
-    executionResult.textContent = "同票のため、処刑者なし";
-  } else {
-    executionResult.textContent =
-      `${getVotingName(result.targetUid)} が処刑されました。`;
-  }
+function render(){if(!data)return;const p=phase();if(p!=='discussion'&&timer){clearInterval(timer);timer=null;}
+ if(p==='lobby')renderLobby();else if(p==='firstNight')renderReveal();else if(p==='night')renderNight();else if(p==='day')renderDay();else if(p==='discussion')renderDiscussion();else if(p==='voting')renderVoting();else if(p==='voteResult')renderVoteResult();else if(p==='gameOver')renderGameOver();
+ lastRenderedPhase=p;
 }
-
-function enterOnlineVoteResult() {
-  entryScreen.hidden = true;
-  lobbyScreen.hidden = true;
-  roleRevealBox.hidden = true;
-  nightScreen.hidden = true;
-  dayScreen.hidden = true;
-  discussionScreen.hidden = true;
-  voteScreen.hidden = true;
-  voteResultScreen.hidden = false;
-
-renderOnlineSurvivors();
-watchOnlineEliminated();
-
-  if (stopVoteResultListener) stopVoteResultListener();
-
-  stopVoteResultListener = onValue(
-    ref(db, `rooms/${currentRoom}/voteResult`),
-    snapshot => {
-      if (snapshot.exists()) {
-        renderOnlineVoteResult(snapshot.val());
-      } else {
-        executionResult.textContent = "集計結果を読み込んでいます。";
-      }
-    },
-    error => {
-      console.error("集計結果取得エラー:", error);
-      executionResult.textContent =
-        "集計結果を取得できません：" + error.message;
-    }
-  );
-}
-
-window.addEventListener("pagehide", () => {
-  if (stopVoteReadyListener) stopVoteReadyListener();
-  if (stopMyVoteListener) stopMyVoteListener();
-  if (stopVoteResultListener) stopVoteResultListener();
-});
-
-
-/* ========================================
-   生存者・脱落者の表示
-======================================== */
-const aliveMembersBox = document.getElementById("online-alive-members");
-const eliminatedMembersBox = document.getElementById("online-eliminated-members");
-const mySurvivalStatus = document.getElementById("online-my-survival-status");
-let eliminatedPlayers = {};
-let stopEliminatedListener = null;
-
-function isOnlinePlayerAlive(uid) {
-  return eliminatedPlayers[uid] !== true;
-}
-
-function makeSurvivalRow(uid, member, alive) {
-  const row = document.createElement("div");
-  row.className = "online-member";
-  if (!alive) row.classList.add("online-eliminated-member");
-
-  const name = document.createElement("strong");
-  name.textContent = member.name;
-
-  const status = document.createElement("span");
-  if (!alive) {
-    status.textContent = uid === currentUid ? "あなた・脱落" : "脱落";
-  } else if (uid === currentHostUid) {
-    status.textContent = "ホスト";
-  } else if (uid === currentUid) {
-    status.textContent = "あなた";
-  } else {
-    status.textContent = "生存";
-  }
-
-  row.append(name, status);
-  return row;
-}
-
-function renderOnlineSurvivors() {
-  if (!aliveMembersBox || !eliminatedMembersBox) return;
-
-  aliveMembersBox.replaceChildren();
-  eliminatedMembersBox.replaceChildren();
-
-  let aliveCount = 0;
-  let eliminatedCount = 0;
-
-  currentMembers.forEach(([uid, member]) => {
-    const alive = isOnlinePlayerAlive(uid);
-    const row = makeSurvivalRow(uid, member, alive);
-
-    if (alive) {
-      aliveMembersBox.appendChild(row);
-      aliveCount++;
-    } else {
-      eliminatedMembersBox.appendChild(row);
-      eliminatedCount++;
-    }
-  });
-
-  if (eliminatedCount === 0) {
-    const message = document.createElement("p");
-    message.textContent = "脱落者はいません。";
-    eliminatedMembersBox.appendChild(message);
-  }
-
-  if (mySurvivalStatus) {
-    mySurvivalStatus.textContent = isOnlinePlayerAlive(currentUid)
-      ? `あなたは生存しています。（生存者${aliveCount}人）`
-      : "あなたは脱落しました。以降は観戦者です。";
-  }
-}
-
-function watchOnlineEliminated() {
-  if (stopEliminatedListener) {
-    stopEliminatedListener();
-    stopEliminatedListener = null;
-  }
-
-  stopEliminatedListener = onValue(
-    ref(db, `rooms/${currentRoom}/eliminated`),
-    snapshot => {
-      eliminatedPlayers = snapshot.val() || {};
-      renderOnlineSurvivors();
-    },
-    error => {
-      console.error("脱落者の同期エラー:", error);
-      if (mySurvivalStatus) {
-        mySurvivalStatus.textContent =
-          "生存状況を取得できません：" + error.message;
-      }
-    }
-  );
-}
-
-window.addEventListener("pagehide", () => {
-  if (stopEliminatedListener) stopEliminatedListener();
-});
+window.addEventListener('pagehide',()=>{if(offRoom)offRoom();if(timer)clearInterval(timer);});

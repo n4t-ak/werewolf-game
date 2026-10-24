@@ -1367,29 +1367,28 @@ let nightDoneByMe = false;
 let stopNightDoneListener = null;
 
 
+
 function updateNightDoneButton() {
   const needsAction = Object.prototype.hasOwnProperty.call(
     NIGHT_ACTION_ROLES,
     myNightRole
   );
 
-  if (!myNightRole || currentPhase !== "night") {
+  if (!myNightRole || currentPhase !== "night" || nightDoneByMe) {
     nightDoneButton.hidden = true;
     return;
   }
 
-  if (nightDoneByMe) {
+  if (needsAction && !nightActionSaved) {
     nightDoneButton.hidden = true;
     return;
   }
 
-  nightDoneButton.hidden = false;
-  nightDoneButton.disabled = needsAction && !nightActionSaved;
-  nightDoneButton.textContent =
-    needsAction && !nightActionSaved
-      ? "先に夜の行動を確定してください"
-      : "夜の行動を完了する";
+  nightDoneButton.hidden = needsAction;
+  nightDoneButton.disabled = false;
+  nightDoneButton.textContent = "夜の行動を完了する";
 }
+
 
 
 async function markMyNightDone() {
@@ -2299,6 +2298,9 @@ function enterOnlineVoteResult() {
   voteScreen.hidden = true;
   voteResultScreen.hidden = false;
 
+renderOnlineSurvivors();
+watchOnlineEliminated();
+
   if (stopVoteResultListener) stopVoteResultListener();
 
   stopVoteResultListener = onValue(
@@ -2322,4 +2324,102 @@ window.addEventListener("pagehide", () => {
   if (stopVoteReadyListener) stopVoteReadyListener();
   if (stopMyVoteListener) stopMyVoteListener();
   if (stopVoteResultListener) stopVoteResultListener();
+});
+
+
+/* ========================================
+   生存者・脱落者の表示
+======================================== */
+const aliveMembersBox = document.getElementById("online-alive-members");
+const eliminatedMembersBox = document.getElementById("online-eliminated-members");
+const mySurvivalStatus = document.getElementById("online-my-survival-status");
+let eliminatedPlayers = {};
+let stopEliminatedListener = null;
+
+function isOnlinePlayerAlive(uid) {
+  return eliminatedPlayers[uid] !== true;
+}
+
+function makeSurvivalRow(uid, member, alive) {
+  const row = document.createElement("div");
+  row.className = "online-member";
+  if (!alive) row.classList.add("online-eliminated-member");
+
+  const name = document.createElement("strong");
+  name.textContent = member.name;
+
+  const status = document.createElement("span");
+  if (!alive) {
+    status.textContent = uid === currentUid ? "あなた・脱落" : "脱落";
+  } else if (uid === currentHostUid) {
+    status.textContent = "ホスト";
+  } else if (uid === currentUid) {
+    status.textContent = "あなた";
+  } else {
+    status.textContent = "生存";
+  }
+
+  row.append(name, status);
+  return row;
+}
+
+function renderOnlineSurvivors() {
+  if (!aliveMembersBox || !eliminatedMembersBox) return;
+
+  aliveMembersBox.replaceChildren();
+  eliminatedMembersBox.replaceChildren();
+
+  let aliveCount = 0;
+  let eliminatedCount = 0;
+
+  currentMembers.forEach(([uid, member]) => {
+    const alive = isOnlinePlayerAlive(uid);
+    const row = makeSurvivalRow(uid, member, alive);
+
+    if (alive) {
+      aliveMembersBox.appendChild(row);
+      aliveCount++;
+    } else {
+      eliminatedMembersBox.appendChild(row);
+      eliminatedCount++;
+    }
+  });
+
+  if (eliminatedCount === 0) {
+    const message = document.createElement("p");
+    message.textContent = "脱落者はいません。";
+    eliminatedMembersBox.appendChild(message);
+  }
+
+  if (mySurvivalStatus) {
+    mySurvivalStatus.textContent = isOnlinePlayerAlive(currentUid)
+      ? `あなたは生存しています。（生存者${aliveCount}人）`
+      : "あなたは脱落しました。以降は観戦者です。";
+  }
+}
+
+function watchOnlineEliminated() {
+  if (stopEliminatedListener) {
+    stopEliminatedListener();
+    stopEliminatedListener = null;
+  }
+
+  stopEliminatedListener = onValue(
+    ref(db, `rooms/${currentRoom}/eliminated`),
+    snapshot => {
+      eliminatedPlayers = snapshot.val() || {};
+      renderOnlineSurvivors();
+    },
+    error => {
+      console.error("脱落者の同期エラー:", error);
+      if (mySurvivalStatus) {
+        mySurvivalStatus.textContent =
+          "生存状況を取得できません：" + error.message;
+      }
+    }
+  );
+}
+
+window.addEventListener("pagehide", () => {
+  if (stopEliminatedListener) stopEliminatedListener();
 });

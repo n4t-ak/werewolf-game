@@ -1241,3 +1241,38 @@ input[type="number"] { width: 100px; }
   color: #ffffff;
   font-size: 21px;
 }
+
+
+/* 生存者・脱落者一覧 */
+#online-survival-section {
+  margin-top: 28px;
+  text-align: left;
+}
+#online-survival-section h3 {
+  margin: 22px 0 12px;
+  color: #ffffff;
+  font-size: 18px;
+}
+#online-alive-members,
+#online-eliminated-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.online-eliminated-member {
+  opacity: 0.65;
+  background: #292633;
+  border-color: #6b4b57;
+}
+.online-eliminated-member strong {
+  text-decoration: line-through;
+}
+#online-my-survival-status {
+  margin-top: 24px;
+  padding: 14px;
+  background: #242b3a;
+  border-radius: 10px;
+  color: #ffe7b4;
+  text-align: center;
+  line-height: 1.7;
+}

@@ -34,6 +34,14 @@ const setView = id => { for (const screen of screens) {const el=$(screen);if(el)
 const opt = (select, candidates, label='相手を選択してください') => {const old=select.value;select.replaceChildren(new Option(label,''));for(const u of candidates)select.add(new Option(nameOf(u),u));if(candidates.includes(old))select.value=old;};
 const randomIndex = n => {const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};
 const shuffled = a => {const b=[...a];for(let i=b.length-1;i>0;i--){const j=randomIndex(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
+const voteSkipConfirmModal =
+  document.getElementById("vote-skip-confirm-modal");
+
+const cancelVoteSkipButton =
+  document.getElementById("cancel-vote-skip");
+
+const confirmVoteSkipButton =
+  document.getElementById("confirm-vote-skip");
 function switchEntry(section) {
   entryView=section;
   $('online-menu-screen').hidden=section!=='menu';
@@ -94,7 +102,7 @@ function updateRoleValidity(){if(!data)return;const s=collectSettings();const n=
  $('online-villager-count').textContent=`村人：${n-cnt}人`;const err=validateSettings(s);$('online-role-error').textContent=err;$('online-start-game').disabled=!!err;}
 let saveJob=0;
 function saveSettingsSoon(){clearTimeout(saveJob);if(!host()||phase()!=='lobby')return;saveJob=setTimeout(async()=>{try{const s=collectSettings();if(roleNames.some((_,i)=>!Number.isInteger(s.roleCounts[i])))return;await set(roomRef('settings'),s);}catch(e){notification('設定保存：'+e.message);}},350);}
-function renderLobby(){setView('lobby-screen');$('display-room-code').textContent=room;
+function renderLobby(){setView('lobby-screen');$('online-last-game-review').hidden=!data.lastGame;$('display-room-code').textContent=room;
  const list=Object.entries(members()).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
  $('member-count').textContent=`参加者（${list.length}人）`;
  renderList($('online-members'),list.map(([id,m])=>[m.name,id===data.meta.hostUid?'ホスト':id===uid?'あなた':'参加中']));
@@ -124,7 +132,7 @@ $('online-start-game').onclick=async()=>{
   while(pool.length<ids.length)pool.push('村人');
   if(s.extras.roleMissing){const possible=pool.map((r,i)=>r!=='人狼'&&r!=='村人'?i:-1).filter(i=>i>=0);pool[possible[randomIndex(possible.length)]]='村人';}
   pool=shuffled(pool);const roles={};ids.forEach((id,i)=>roles[id]=pool[i]);
-  await update(roomRef(''),{settings:s,roles,'meta/phase':'firstNight'});
+  await update(roomRef(''),{settings:s,roles,initialRoles:roles,'meta/phase':'firstNight'});
  }catch(e){notification('開始エラー：'+e.message);$('online-start-game').disabled=false;}
 };
 
@@ -227,16 +235,102 @@ $('online-add-minute').onclick=async()=>{if(!host())return;try{const c=thisRound
 $('online-pause-discussion').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{},now=Date.now();await update(roomRef(roundField('discussionTimerControls')),{paused:!c.paused,pausedAt:!c.paused?now:0,pausedMs:(c.pausedMs||0)+(c.paused?Math.max(0,now-(c.pausedAt||now)):0)});}catch(e){notification('一時停止：'+e.message);}};
 async function startVoting(){if(!host()||phase()!=='discussion')return;await update(roomRef(''),{[roundField('voteState')]:{index:1,candidates:Object.fromEntries(alive().map(id=>[id,true]))},'meta/phase':'voting'});}
 $('online-start-vote').onclick=()=>startVoting().catch(e=>notification('投票開始：'+e.message));
-$('online-skip-vote').onclick=async()=>{if(!host()||phase()!=='discussion')return;try{await finishResult({counts:{},tie:true,targetUid:'',skipped:true});}catch(e){notification('スキップ：'+e.message);}};
-function renderVoting(){setView('online-vote-screen');const v=thisRound().voteState||{},index=v.index||1,candidates=Object.keys(v.candidates||{}).filter(id=>v.candidates[id]);const vote=thisRound().votes?.[index]?.[uid];const done=thisRound().voteReady?.[index]||{};
- $('online-vote-title').textContent=index===1?'昼の投票':`再投票（${index}回目）`;
- opt($('online-vote-target'),candidates.filter(id=>id!==uid&&living(id)),'投票する相手を選択');
- $('online-submit-vote').disabled=!living(uid)||!!vote;
- $('online-vote-target').disabled=!living(uid)||!!vote;
- $('online-vote-message').textContent=!living(uid)?'脱落者は投票できません。':vote?'投票済みです。':index>1?'最多得票の候補者だけに再投票します。':'投票先を選択してください。';
- const status=countCompleted(done,alive());$('online-vote-count').textContent=`投票完了：${status.completed} / ${status.total}人`;
- $('online-finish-vote').hidden=!host();$('online-finish-vote').disabled=!status.allDone;
+$('online-skip-vote').onclick=async()=>{
+  if (!host() || phase() !== 'discussion') return;
+  const confirmed = await openVoteSkipConfirm();
+  if (!confirmed || !host() || phase() !== 'discussion') return;
+  const button = $('online-skip-vote');
+  button.disabled = true;
+  try {
+    await finishResult({counts:{}, tie:true, targetUid:'', skipped:true});
+  } catch (e) {
+    notification('スキップ：' + e.message);
+    button.disabled = false;
+  }
+};
+
+function renderVoting() {
+  setView('online-vote-screen');
+
+  const state = thisRound();
+  const v = state.voteState || {};
+  const index = Number(v.index || 1);
+  const candidateMap = v.candidates || {};
+
+  const candidates = Object.keys(candidateMap)
+    .filter(id => candidateMap[id] === true);
+
+  const targets = candidates.filter(
+    id => id !== uid && living(id)
+  );
+
+  const vote = state.votes?.[index]?.[uid];
+  const done = state.voteReady?.[index] || {};
+
+  const select = $('online-vote-target');
+
+  $('online-vote-title').textContent =
+    index === 1
+      ? '昼の投票'
+      : `再投票（${index}回目）`;
+
+  // 候補者が変わったときだけ選択肢を更新する
+  const previous = select.value;
+
+  const existing = Array.from(select.options)
+    .slice(1)
+    .map(option => option.value);
+
+  const changed =
+    existing.length !== targets.length ||
+    existing.some((id, i) => id !== targets[i]);
+
+  if (changed) {
+    select.replaceChildren(
+      new Option('投票する相手を選択', '')
+    );
+
+    for (const id of targets) {
+      select.add(
+        new Option(nameOf(id), id)
+      );
+    }
+
+    if (targets.includes(previous)) {
+      select.value = previous;
+    }
+  }
+
+  const isAlive = living(uid);
+  const alreadyVoted = !!vote;
+
+  select.disabled =
+    !isAlive || alreadyVoted || targets.length === 0;
+
+  $('online-submit-vote').disabled =
+    !isAlive || alreadyVoted || targets.length === 0;
+
+  $('online-vote-message').textContent =
+    !isAlive
+      ? 'あなたは脱落しているため投票できません。'
+      : alreadyVoted
+        ? '投票済みです。'
+        : targets.length === 0
+          ? '投票できる候補者がいません。ホストに状態の確認を依頼してください。'
+          : index > 1
+            ? '最多得票の候補者から選択してください。'
+            : '投票する相手を選択してください。';
+
+  const status = countCompleted(done, alive());
+
+  $('online-vote-count').textContent =
+    `投票完了：${status.completed} / ${status.total}人`;
+
+  $('online-finish-vote').hidden = !host();
+
+  $('online-finish-vote').disabled = !status.allDone;
 }
+
 $('online-submit-vote').onclick=async()=>{if(!living(uid)||phase()!=='voting')return;const v=thisRound().voteState,index=v?.index||1,target=$('online-vote-target').value;if(!target||target===uid||!v.candidates?.[target])return notification('投票先を選択してください。');
  try{await set(roomRef(roundField(`votes/${index}/${uid}`)),target);await set(roomRef(roundField(`voteReady/${index}/${uid}`)),true);}catch(e){notification('投票保存：'+e.message);}};
 async function finishResult(result){
@@ -268,14 +362,221 @@ function renderVoteResult(){setView('online-vote-result-screen');const result=th
  $('online-next-night').hidden=!host();$('online-next-night').textContent=`${round()+1}日目の夜へ進む`;
 }
 $('online-next-night').onclick=async()=>{if(!host()||phase()!=='voteResult')return;try{await update(roomRef(''),{'meta/round':round()+1,'meta/phase':'night'});}catch(e){notification('次の日への移行：'+e.message);}};
-function renderGameOver(){setView('online-game-over-screen');$('online-winner').textContent=`勝利：${data.meta.winner||'判定待ち'}`;
- const original=Object.entries(members()).map(([id,m])=>[m.name,`${data.roles?.[id]||'不明'} / ${living(id)?'生存':'脱落'}`]);
- renderList($('online-final-roles'),original);
- const history=[];for(let i=1;i<=round();i++){const r=data.rounds?.[i]||{};if(r.nightResult)history.push([`${i}日目・朝`,r.nightResult.victimUid?`${nameOf(r.nightResult.victimUid)}が襲撃`:'犠牲者なし']);if(r.voteResult)history.push([`${i}日目・投票`,r.voteResult.targetUid?`${nameOf(r.voteResult.targetUid)}が処刑`:'処刑者なし']);}
- renderList($('online-game-history'),history);
+function buildEndgameReview(game) {
+  const list = $('online-game-history');
+  list.replaceChildren();
+  const rounds = game.rounds || {};
+  const names = game.members || {};
+  const roleMap = game.roles || {};
+  const initialRoleMap = game.initialRoles || roleMap;
+  const displayName = id => names[id]?.name || '不明な参加者';
+  const addRow = (parent, title, content) => {
+    const row = document.createElement('div');
+    row.className = 'online-review-line';
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const body = document.createElement('span');
+    body.textContent = content;
+    row.append(heading, body);
+    parent.append(row);
+  };
+  const days = Object.keys(rounds).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+  if (!days.length) {
+    const p = document.createElement('p');
+    p.textContent = 'ゲームの記録はありません。';
+    list.append(p);
+  }
+  for (const day of days) {
+    const r = rounds[day] || {};
+    const details = document.createElement('details');
+    details.className = 'online-review-day';
+    if(day === days[days.length - 1]) details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = `${day}日目の振り返り`;
+    details.append(summary);
+    const content = document.createElement('div');
+    content.className = 'online-review-content';
+    const night = r.nightResult;
+    if (night) {
+      addRow(content,'朝の結果',night.victimUid ? `${displayName(night.victimUid)}が襲撃されました` : '犠牲者なし');
+      if(night.eventText) addRow(content,'出来事',night.eventText);
+    }
+    if(r.voteResult) {
+      const vr = r.voteResult;
+      addRow(content,'処刑結果',vr.targetUid ? `${displayName(vr.targetUid)}が処刑されました` : (vr.skipped ? '投票スキップ・処刑者なし' : '同票・処刑者なし'));
+      for (const [candidate,count] of Object.entries(vr.counts || {}).sort((a,b)=>b[1]-a[1])) {
+        addRow(content,'得票',`${displayName(candidate)}：${count}票`);
+      }
+    }
+    for (const index of Object.keys(r.votes || {}).sort((a,b)=>Number(a)-Number(b))) {
+      const votes = r.votes[index] || {};
+      if(Object.keys(votes).length) {
+        const desc = Object.entries(votes).map(([from,to])=>`${displayName(from)} → ${displayName(to)}`).join(' ／ ');
+        addRow(content,`${index==='1'?'投票':'再投票'}の内訳`,desc);
+      }
+    }
+    const actions = r.nightActions || {};
+    if(Object.keys(actions).length) {
+      for (const [actor,action] of Object.entries(actions)) {
+        if(!action || !action.role) continue;
+        const verb = ({'人狼':'襲撃','占い師':'占い','騎士':'護衛','怪盗':'交換'})[action.role] || '行動';
+        addRow(content,'夜の行動',`${displayName(actor)}（${action.role}）：${action.targetUid ? `${displayName(action.targetUid)}を${verb}` : '行動なし'}`);
+      }
+    }
+    details.append(content);
+    list.append(details);
+  }
+  const roleList = $('online-final-roles');
+  roleList.replaceChildren();
+  for(const [id, member] of Object.entries(names)) {
+    const card = document.createElement('div');
+    card.className = 'online-result-player';
+    const identity = document.createElement('div');
+    const name = document.createElement('strong');name.textContent=member.name;
+    const detail=document.createElement('span');
+    const changed = initialRoleMap[id] && initialRoleMap[id] !== roleMap[id];
+    detail.textContent=`${roleMap[id]||'不明'}${changed ? `（開始時：${initialRoleMap[id]}）` : ''}`;
+    identity.append(name, detail);
+    const state=document.createElement('span');
+    state.className='online-result-state';
+    state.textContent=game.eliminated?.[id]===true?'脱落':'生存';
+    card.append(identity,state);
+    roleList.append(card);
+  }
 }
+
+function renderGameOver(){
+  setView('online-game-over-screen');
+  $('online-winner').textContent=`${data.meta.winner||'判定待ち'}の勝利`;
+  const winner=data.meta.winner || '';
+  const over=$('online-game-over-screen');
+  over.dataset.winner=winner==='人狼陣営'?'wolf':winner==='てるてる'?'teruteru':'villager';
+  $('online-final-round').textContent=`${round()}日間の記録`;
+  $('online-final-player-count').textContent=`${Object.keys(members()).length}人参加`;
+  buildEndgameReview(data);
+  const restart=$('online-play-again');
+  restart.hidden=!host();
+  restart.disabled=false;
+  $('online-restart-wait').hidden=host();
+}
+
+$('online-play-again').onclick=async()=>{
+  if(!host()||phase()!=='gameOver')return;
+  const restart=$('online-play-again');
+  restart.disabled=true;
+  try {
+    // Firebaseのマルチパス更新で、全員が同じ瞬間にロビーへ戻る。
+    // members, settings, meta.hostUid, 招待用ルーム番号は維持する。
+    // 前回の結果はロビーからも見返せるよう1試合分だけ保存する。
+    const archive={
+      members:data.members||{},
+      initialRoles:data.initialRoles||data.roles||{},
+      roles:data.roles||{},
+      eliminated:data.eliminated||{},
+      rounds:data.rounds||{},
+      meta:{winner:data.meta.winner||'',round:round()},
+      endedAt:Date.now()
+    };
+    const changes={
+      lastGame:archive,
+      roles:null,
+      initialRoles:null,
+      eliminated:null,
+      rounds:null,
+      ready:null,
+      'meta/winner':null,
+      'meta/round':1,
+      'meta/phase':'lobby',
+      'meta/gamesPlayed':Number(data.meta.gamesPlayed||0)+1
+    };
+    await update(roomRef(''),changes);
+    notification('同じメンバーでロビーへ戻りました。設定変更や追加参加ができます。');
+  } catch(e) {
+    notification('再戦準備エラー：'+e.message);
+    restart.disabled=false;
+  }
+};
+
+$('online-last-game-review').onclick=()=>{
+  if(!data?.lastGame)return;
+  const panel=$('online-last-game-panel');
+  panel.hidden=!panel.hidden;
+  if(panel.hidden)return;
+  const last=data.lastGame;
+  $('online-last-winner').textContent=`前回：${last.meta?.winner||'結果なし'}の勝利`;
+  // 専用の2つの一覧を利用して既存のレビュー関数を再利用する。
+  const currentHistory=$('online-game-history');
+  const currentRoles=$('online-final-roles');
+  const historySlot=document.createElement('div');
+  const rolesSlot=document.createElement('div');
+  historySlot.id='online-game-history';
+  rolesSlot.id='online-final-roles';
+  currentHistory.id='online-game-history-current';
+  currentRoles.id='online-final-roles-current';
+  try {
+    panel.querySelector('.online-last-role-slot').replaceChildren(rolesSlot);
+    panel.querySelector('.online-last-history-slot').replaceChildren(historySlot);
+    buildEndgameReview(last);
+  } finally {
+    rolesSlot.id='online-final-roles-archive';
+    historySlot.id='online-game-history-archive';
+    currentHistory.id='online-game-history';
+    currentRoles.id='online-final-roles';
+  }
+};
 function render(){if(!data)return;const p=phase();if(p!=='discussion'&&timer){clearInterval(timer);timer=null;}
  if(p==='lobby')renderLobby();else if(p==='firstNight')renderReveal();else if(p==='night')renderNight();else if(p==='day')renderDay();else if(p==='discussion')renderDiscussion();else if(p==='voting')renderVoting();else if(p==='voteResult')renderVoteResult();else if(p==='gameOver')renderGameOver();
  lastRenderedPhase=p;
 }
 window.addEventListener('pagehide',()=>{if(offRoom)offRoom();if(timer)clearInterval(timer);});
+
+function openVoteSkipConfirm() {
+  return new Promise(resolve => {
+    if (!voteSkipConfirmModal || !cancelVoteSkipButton || !confirmVoteSkipButton) {
+      notification('確認画面が見つかりません。');
+      resolve(false);
+      return;
+    }
+
+    voteSkipConfirmModal.hidden = false;
+    confirmVoteSkipButton.focus();
+    let settled = false;
+
+    const close = accepted => {
+      if (settled) return;
+      settled = true;
+      voteSkipConfirmModal.hidden = true;
+      cancelVoteSkipButton.removeEventListener('click', onCancel);
+      confirmVoteSkipButton.removeEventListener('click', onConfirm);
+      voteSkipConfirmModal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKeydown);
+      $('online-skip-vote').focus();
+      resolve(accepted);
+    };
+
+    const onCancel = () => close(false);
+    const onConfirm = () => close(true);
+    const onBackdrop = event => {
+      if (event.target === voteSkipConfirmModal) close(false);
+    };
+    const onKeydown = event => {
+      if (event.key === 'Escape') close(false);
+      if (event.key === 'Tab') {
+        const first = cancelVoteSkipButton;
+        const last = confirmVoteSkipButton;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    cancelVoteSkipButton.addEventListener('click', onCancel);
+    confirmVoteSkipButton.addEventListener('click', onConfirm);
+    voteSkipConfirmModal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKeydown);
+  });
+}

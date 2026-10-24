@@ -9,12 +9,149 @@
   
 <link rel="stylesheet" href="./style.css?v=20261023-2">
 
+<style>
+  /* 投票スキップボタンと確認ダイアログ：このページに限定 */
+  #online-skip-vote.vote-skip-button {
+    background: #303b51;
+    border: 1px solid #67758e;
+    color: #f2f5fc;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+  #online-skip-vote.vote-skip-button:hover:not(:disabled) {
+    background: #40516d;
+  }
+  #vote-skip-confirm-modal[hidden] { display: none !important; }
+  #vote-skip-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(9, 14, 27, .78);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+  }
+  #vote-skip-confirm-modal .confirm-modal-card {
+    box-sizing: border-box;
+    width: min(100%, 420px);
+    padding: 30px 26px 24px;
+    border-radius: 22px;
+    background: linear-gradient(150deg, #25314a, #161e30);
+    border: 1px solid #526079;
+    box-shadow: 0 25px 65px rgba(0,0,0,.48);
+    text-align: center;
+  }
+  #vote-skip-confirm-modal .confirm-modal-symbol {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: #4d3955;
+    color: #f9c5d0;
+    border: 1px solid #9b637b;
+    font-size: 24px;
+    font-weight: 800;
+  }
+  #vote-skip-confirm-modal h3 {
+    margin: 0 0 12px;
+    color: #fff;
+    font-size: clamp(19px, 5vw, 24px);
+    font-weight: 800;
+  }
+  #vote-skip-confirm-modal p {
+    margin: 0;
+    color: #d0d8e6;
+    font-size: 14px;
+    line-height: 1.9;
+  }
+  #vote-skip-confirm-modal .confirm-modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 25px;
+  }
+  #vote-skip-confirm-modal .confirm-modal-buttons button {
+    flex: 1;
+    width: auto;
+    margin: 0;
+    padding: 12px 10px;
+    border-radius: 11px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  #vote-skip-confirm-modal .modal-cancel-button {
+    background: #36435b;
+    color: #f0f4fa;
+    border: 1px solid #71819b;
+    box-shadow: none;
+  }
+  #vote-skip-confirm-modal .modal-confirm-button {
+    background: #b64c61;
+    color: white;
+    border: 1px solid #dc8393;
+    box-shadow: none;
+  }
+  #vote-skip-confirm-modal .modal-cancel-button:hover { background: #485974; }
+  #vote-skip-confirm-modal .modal-confirm-button:hover { background: #c75e72; }
+  #vote-skip-confirm-modal button:focus-visible {
+    outline: 3px solid #e2eafc;
+    outline-offset: 3px;
+  }
+  @media (max-width: 380px) {
+    #vote-skip-confirm-modal .confirm-modal-card { padding: 24px 18px; }
+    #vote-skip-confirm-modal .confirm-modal-buttons { flex-direction: column; }
+  }
+
+    /* 結果発表・振り返り・再戦ロビー */
+    #online-game-over-screen{color:#e7edf8;--finale-accent:#e6c57e}
+    #online-game-over-screen[data-winner="wolf"]{--finale-accent:#ef8794}
+    #online-game-over-screen[data-winner="teruteru"]{--finale-accent:#a8a1ff}
+    .online-finale-header{position:relative;overflow:hidden;text-align:center;background:radial-gradient(circle at 50% -10%,#39435d,#1b2539 65%,#131b2d);border:1px solid #65718a;border-radius:22px;padding:38px 18px 30px;margin-bottom:20px;box-shadow:0 20px 45px #0003}
+    .online-finale-header:after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.11;background:radial-gradient(circle at 15% 20%,#fff 1px,transparent 2px),radial-gradient(circle at 85% 76%,#fff 1px,transparent 2px);background-size:88px 88px,117px 117px}
+    .online-finale-eyebrow{font-size:11px;letter-spacing:.33em;font-weight:800;color:#a8b5cf}
+    .online-finale-emblem{display:grid;place-items:center;width:74px;height:74px;border-radius:50%;border:2px solid var(--finale-accent);color:var(--finale-accent);font-size:40px;margin:22px auto 14px;background:#fff1;box-shadow:0 0 34px #fff2}
+    .online-finale-caption{color:#cbd4e4;font-size:14px;margin:0 0 8px}
+    #online-game-over-screen #online-winner{font-size:clamp(27px,6vw,38px);line-height:1.35;margin:0;color:var(--finale-accent);text-shadow:0 1px 18px #0006}
+    .online-finale-stats{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:22px}
+    .online-finale-stats span{padding:7px 13px;border-radius:50px;border:1px solid #546178;background:#0b142554;color:#dce4f3;font-size:12px}
+    .online-finale-section{background:#202b40;border:1px solid #44516a;border-radius:18px;padding:22px 16px;margin-bottom:17px}
+    .online-finale-section h3{color:#fff;margin:0 0 8px;font-size:19px}
+    .online-finale-section>p{color:#b9c6da;font-size:13px;line-height:1.8;margin:0 0 16px}
+    .online-result-player{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px;border-radius:11px;background:#121e30;border:1px solid #35435b;margin:8px 0;text-align:left}
+    .online-result-player>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .online-result-player strong{font-size:15px;color:#f1f5ff}
+    .online-result-player div span{font-size:12px;color:#b3c1d6}
+    .online-result-state{flex-shrink:0;color:#e2eaf9;font-size:12px;border-radius:25px;border:1px solid #596a84;padding:5px 9px}
+    .online-review-day{border:1px solid #4b5b74;border-radius:12px;background:#142036;margin:10px 0;overflow:hidden}
+    .online-review-day summary{padding:15px;color:#fff;font-weight:700;cursor:pointer;list-style-position:inside}
+    .online-review-day[open] summary{background:#2d3b55}
+    .online-review-content{padding:8px 14px 14px}
+    .online-review-line{display:grid;grid-template-columns:minmax(72px,32%) 1fr;gap:12px;border-bottom:1px solid #33435c;padding:10px 1px;line-height:1.7;font-size:13px;text-align:left;overflow-wrap:anywhere}
+    .online-review-line:last-child{border-bottom:0}
+    .online-review-line strong{color:#adbfdb}
+    .online-review-line span{color:#eff3fa}
+    .online-finale-actions{display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:8px 0 18px;text-align:center}
+    #online-play-again{background:linear-gradient(115deg,#d4b16c,#f0d395);border:1px solid #fae8b7;color:#242538;padding:17px;border-radius:13px;font-weight:800;font-size:16px;box-shadow:0 8px 22px #0004}
+    #online-restart-wait{color:#d1dced;background:#213049;border:1px solid #4a5e7b;padding:14px;border-radius:11px}
+    .online-finale-exit{display:block;padding:14px;color:#c8d4e9;text-decoration:underline;font-size:13px}
+    .online-lobby-replay-note{margin:16px 0;padding:14px;background:#eaf2ff;border-left:4px solid #607ca8;border-radius:10px;color:#23334e;text-align:left}
+    .online-lobby-replay-note strong{font-size:14px}
+    .online-lobby-replay-note p{margin:7px 0 0;font-size:12px;line-height:1.7}
+    #online-last-game-panel{margin:12px 0;padding:13px;border:1px solid #52617d;background:#202b40;border-radius:13px;color:#fff}
+    #online-last-game-panel h3,#online-last-game-panel h4{color:#fff}
+    .online-subtle-action{background:#334560;border:1px solid #566e90;color:#fff;border-radius:11px}
+    @media(max-width:420px){.online-finale-section{padding:18px 12px}.online-review-line{grid-template-columns:1fr;gap:1px}.online-finale-header{padding:26px 12px}}
+</style>
 </head>
 <body>
 
 
 
-<script type="module" src="./online.js?v=20261024-full"></script>
+<script type="module" src="./online.js?v=20261024-replay-1"></script>
 
 
 
@@ -100,6 +237,19 @@
           <p id="lobby-notice">
             全員が参加するまで待ってください。
           </p>
+
+          <div class="online-lobby-replay-note">
+            <strong>このルームで続けて遊べます</strong>
+            <p>参加メンバーとルーム番号を引き継ぎます。ホストは役職や詳細設定を変更でき、新しい参加者も招待できます。</p>
+          </div>
+          <button id="online-last-game-review" type="button" hidden class="online-subtle-action">前回の結果を振り返る</button>
+          <section id="online-last-game-panel" class="online-last-game-panel" hidden>
+            <h3 id="online-last-winner">前回の結果</h3>
+            <h4>全員の役職</h4>
+            <div class="online-last-role-slot"></div>
+            <h4>試合の振り返り</h4>
+            <div class="online-last-history-slot"></div>
+          </section>
 
           <!-- 参加者用：閲覧のみ -->
           <div id="online-guest-settings" hidden>
@@ -292,7 +442,7 @@
   <h3>参加者</h3>
   <div id="online-discussion-members"></div>
 
-<button id="online-skip-vote" type="button" hidden>投票をスキップする</button>
+<button id="online-skip-vote" type="button" class="vote-skip-button" hidden>投票をスキップする</button>
 <button id="online-start-vote" type="button" hidden>
   議論を終了して投票へ進む
 </button>
@@ -343,15 +493,33 @@
 
 
 <!-- ゲーム終了画面 -->
-<div id="online-game-over-screen" hidden>
-  <h2 id="online-winner">ゲーム終了</h2>
-  <h3>全員の役職・生存状況</h3>
-  <div id="online-final-roles"></div>
-  <h3>ゲームの記録</h3>
-  <div id="online-game-history"></div>
-  <p>新しく遊ぶ場合は、ゲームモード選択に戻ってルームを作成してください。</p>
-  <a href="./index.html">ゲームモード選択へ戻る</a>
-</div>
+        <div id="online-game-over-screen" hidden>
+          <div class="online-finale-header">
+            <span class="online-finale-eyebrow">GAME RESULT</span>
+            <div class="online-finale-emblem" aria-hidden="true">★</div>
+            <p class="online-finale-caption">ゲーム終了</p>
+            <h2 id="online-winner">勝利陣営</h2>
+            <div class="online-finale-stats">
+              <span id="online-final-player-count">参加者</span>
+              <span id="online-final-round">試合の記録</span>
+            </div>
+          </div>
+          <section class="online-finale-section">
+            <h3>全員の役職を公開</h3>
+            <p>ゲーム開始時と終了時の役職を確認できます。</p>
+            <div id="online-final-roles" class="online-result-roles"></div>
+          </section>
+          <section class="online-finale-section">
+            <h3>試合を振り返る</h3>
+            <p>日付を押すと、夜の行動・朝の結果・投票の詳細が開きます。</p>
+            <div id="online-game-history" class="online-review-timeline"></div>
+          </section>
+          <section class="online-finale-actions">
+            <button id="online-play-again" type="button" hidden>↻ もう一度遊ぶ・ロビーへ戻る</button>
+            <p id="online-restart-wait" hidden>ホストが「もう一度遊ぶ」を押すと、全員が自動で同じロビーに戻ります。</p>
+            <a href="./index.html" class="online-finale-exit">ゲームモード選択へ戻る</a>
+          </section>
+        </div>
 
         <!-- ステータス表示 -->
         <p id="online-status" role="status"></p>
@@ -396,5 +564,33 @@
       updateBackButton();
     })();
   </script>
+  <div id="vote-skip-confirm-modal" class="confirm-modal" hidden role="presentation">
+  <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="vote-skip-confirm-title" aria-describedby="vote-skip-confirm-description">
+    <div class="confirm-modal-symbol" aria-hidden="true">!</div>
+    <h3 id="vote-skip-confirm-title">投票をスキップしますか？</h3>
+    <p id="vote-skip-confirm-description">
+      本日の投票を行わず、処刑者なしで次へ進みます。<br>
+      この操作は取り消せません。
+    </p>
+
+    <div class="confirm-modal-buttons">
+      <button
+        id="cancel-vote-skip"
+        type="button"
+        class="modal-cancel-button"
+      >
+        戻る
+      </button>
+
+      <button
+        id="confirm-vote-skip"
+        type="button"
+        class="modal-confirm-button"
+      >
+        スキップする
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

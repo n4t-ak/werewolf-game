@@ -16,7 +16,10 @@ const extras = [
 let room = null, uid = null, data = null, offRoom = null, currentView = '', busy = false;
 let entryView = 'menu', timer = null, savedSettings = '', lastRenderedPhase = '';
 const roomRef = field => ref(db, field?.startsWith('rooms/') ? field : `rooms/${room}${field ? '/' + field : ''}`);
-const roundField = (field, round = data?.meta?.round || 1) => getRoundPath(room, round, field);
+
+const roundField = (field, day = data?.meta?.round || 1) =>
+  `rounds/${day}${field ? '/' + field : ''}`;
+
 const myRole = () => data?.roles?.[uid] || '';
 const host = () => !!uid && data?.meta?.hostUid === uid;
 const phase = () => data?.meta?.phase || 'lobby';

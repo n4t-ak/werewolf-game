@@ -1,0 +1,289 @@
+/* MOONLIT VILLAGE — stage 1 shared visual foundation */
+:root{--mv-gold:#d8b875;--mv-gold-light:#f6dfac;--mv-ink:#0b0d13;--mv-burgundy:#77303e;--mv-line:rgba(216,184,117,.42);--mv-muted:#d7c9b5;color-scheme:dark}
+html{background:#080c14}
+body.mv-theme{background:radial-gradient(circle at 50% 4%,rgba(239,219,161,.13) 0 5%,transparent 30%),linear-gradient(180deg,rgba(5,8,16,.1),#090b13 90%),radial-gradient(ellipse at 49% 35%,#273245,#0d1220 58%,#06090f)!important;color:#f4eadb!important;min-height:100dvh;position:relative;isolation:isolate;transition:background-color .7s ease}
+body.mv-theme::before{position:fixed;z-index:-1;inset:0;pointer-events:none;opacity:.67;background:radial-gradient(circle at 50% 8%,rgba(255,241,202,.65) 0 43px,rgba(239,229,196,.15) 45px,transparent 125px),radial-gradient(ellipse at 70% 94%,rgba(69,19,32,.48),transparent 52%);content:'';background-size:auto!important;animation:mv-mist 15s ease-in-out infinite alternate}
+body.mv-theme::after{position:fixed;z-index:-1;inset:auto 0 0;height:32vh;content:'';pointer-events:none;background:linear-gradient(0deg,#05080c,transparent),repeating-linear-gradient(110deg,transparent 0 56px,rgba(8,13,19,.32) 57px 59px,transparent 60px 122px);opacity:.5}
+body.mv-theme[data-scene="day"]{background:radial-gradient(circle at 78% 5%,rgba(244,187,115,.21),transparent 32%),linear-gradient(160deg,#403b43,#192333 52%,#13141d)!important}
+body.mv-theme[data-scene="night"]{background:radial-gradient(circle at 50% 4%,rgba(216,217,252,.18),transparent 28%),linear-gradient(150deg,#111b34,#090d1d 62%,#090a10)!important}
+body.mv-theme[data-scene="victory"]{background:radial-gradient(circle at 50% 3%,rgba(228,183,85,.17),transparent 40%),linear-gradient(155deg,#302538,#130f1b 68%,#09080f)!important}
+body.mv-theme .app-shell{width:min(100% - 28px,680px);padding-top:clamp(32px,5vw,66px);position:relative;z-index:0}
+body.mv-theme .app-header{padding-bottom:23px;text-align:center}
+body.mv-theme .brand-mark,body.mv-theme .mv-emblem{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 12px;border:1px solid var(--mv-line);border-radius:50%;background:radial-gradient(circle,#3b3741,#151725);box-shadow:0 0 0 5px rgba(209,168,91,.06),0 0 42px rgba(235,195,124,.16);color:var(--mv-gold-light);font-size:36px}
+body.mv-theme .eyebrow,body.mv-theme .mv-kicker{font-family:Georgia,serif;letter-spacing:.24em;color:var(--mv-gold);font-size:10px;font-weight:700;text-transform:uppercase}
+body.mv-theme .app-header h1{color:#f7e9ca;font-family:Georgia,'Yu Mincho','Hiragino Mincho ProN',serif;letter-spacing:.12em;font-size:clamp(31px,7vw,48px);text-shadow:0 2px 22px rgba(211,175,101,.27);line-height:1.28}
+body.mv-theme .app-header .subtitle{color:#d5c7b2;font-size:13px;letter-spacing:.07em}
+body.mv-theme .mv-mode-nav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:3px 0 18px}
+body.mv-theme .mv-mode-nav a{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 10px;border:1px solid rgba(218,181,110,.32);border-radius:10px;background:rgba(10,15,24,.78);color:#e5d5b5;text-decoration:none;font-size:14px;font-weight:700;transition:.2s}
+body.mv-theme .mv-mode-nav a[aria-current="page"]{background:linear-gradient(120deg,#513d30,#201c22);border-color:#d2b273;color:#ffebbd;box-shadow:inset 0 0 0 1px #9b78434a}
+body.mv-theme .mv-mode-nav a:hover{border-color:#f6d899;transform:translateY(-2px)}
+body.mv-theme .game-card{position:relative;overflow:visible;background:linear-gradient(155deg,rgba(33,34,42,.98),rgba(13,17,27,.98))!important;border:1px solid #a78a57!important;border-radius:17px!important;box-shadow:0 20px 64px #000a,0 0 0 4px #0b0e17,0 0 0 5px rgba(173,137,74,.27),inset 0 1px rgba(255,236,188,.1)!important;padding:clamp(22px,6vw,35px)!important}
+body.mv-theme .game-card::before,body.mv-theme .game-card::after{content:'✦';position:absolute;top:7px;left:13px;color:#ab864d;font-size:17px;pointer-events:none}
+body.mv-theme .game-card::after{left:auto;right:13px}
+body.mv-theme .game-card h2,body.mv-theme .game-card h3{font-family:'Yu Mincho','Hiragino Mincho ProN',Georgia,serif;color:#f4ddb0;line-height:1.45}
+body.mv-theme .game-card p,body.mv-theme .game-card .field-label{color:#e1d8cb}
+body.mv-theme .game-card button:not(.modal-confirm-button):not(.modal-cancel-button){background:linear-gradient(115deg,#655034,#3f332e)!important;border:1px solid #b39866!important;color:#ffefc9!important;border-radius:10px;box-shadow:inset 0 1px #ffeca726,0 6px 17px #0005!important;text-shadow:0 1px 2px #0005;min-height:46px;transition:filter .2s,transform .2s,box-shadow .2s}
+body.mv-theme .game-card button:hover:not(:disabled){filter:brightness(1.16);transform:translateY(-1px)}
+body.mv-theme .game-card button:disabled{opacity:.48;cursor:not-allowed;transform:none!important}
+body.mv-theme .game-card input,body.mv-theme .game-card select,body.mv-theme .game-card textarea{background:#151c2b;color:#f7eddf;border:1px solid #76694f;border-radius:9px;accent-color:#d0a766;max-width:100%}
+body.mv-theme .game-card input:focus-visible,body.mv-theme .game-card select:focus-visible,body.mv-theme .game-card textarea:focus-visible{outline:2px solid #efc987;outline-offset:2px}
+body.mv-theme #online-members .online-member,body.mv-theme #online-game .online-member{border-color:rgba(210,176,111,.33);background:#1b2231}
+body.mv-theme .online-chat-panel{border-color:#82714e;background:#181d28}body.mv-theme .online-chat-messages{background:#111722}
+body.mv-theme .app-footer,body.mv-theme .mv-footer{color:#a99578;text-align:center;font-size:10px;letter-spacing:.16em;margin:23px 0}
+body.mv-theme #back-to-game-mode-online{z-index:4}
+@keyframes mv-mist{from{opacity:.45;transform:translateY(0)}to{opacity:.8;transform:translateY(-12px)}}
+@media(max-width:480px){body.mv-theme .app-shell{width:calc(100% - 28px);padding-top:30px}body.mv-theme .game-card{padding:24px 18px!important}body.mv-theme .mv-mode-nav a{font-size:12px;padding:12px 4px}body.mv-theme .app-header h1{font-size:32px}}
+@media(prefers-reduced-motion:reduce){body.mv-theme::before{animation:none}body.mv-theme *,body.mv-theme *::before,body.mv-theme *::after{transition:none!important;animation-duration:.01ms!important}}
+
+/* ロビー参加後はモード切替を隠し、誤操作を防ぐ */
+body.mv-theme #online-mode-nav[hidden]{display:none!important}
+body.mv-theme .game-card #online-leave-room{
+  display:block;box-sizing:border-box;width:min(100%,380px);max-width:100%;margin:14px auto 20px;position:relative;left:auto;right:auto;transform:none;text-align:center;
+  background:linear-gradient(120deg,#481e2d,#271824)!important;
+  border:1px solid #a86671!important;color:#ffe0df!important;
+  box-shadow:inset 0 1px #ffffff12,0 5px 15px #0005!important
+}
+body.mv-theme .game-card #online-leave-room:hover:not(:disabled){filter:brightness(1.22)}
+
+/* ロビー退出ボタンを招待ボタンと同じ中央列に配置 */
+body.mv-theme #lobby-screen #online-leave-room{display:block!important;box-sizing:border-box!important;width:min(100%,380px)!important;max-width:100%!important;margin:14px auto 20px!important;float:none!important;position:static!important;transform:none!important;text-align:center!important;}
+
+
+/* ===== Stage 2: shared illustrated tarot cards (CSS only) ===== */
+body.mv-theme .mv-tarot{--rc:#d5b374;--shine:#f8e4b7;width:min(100%,280px);aspect-ratio:5 / 7.2;margin:12px auto 24px;perspective:1100px;color:#fbe9c4;font-family:Georgia,'Yu Mincho','Hiragino Mincho ProN',serif;user-select:none}
+body.mv-theme .mv-tarot[data-faction="wolf"]{--rc:#c15d6e;--shine:#ffd0d7}
+body.mv-theme .mv-tarot[data-faction="neutral"]{--rc:#ae92d6;--shine:#eee0ff}
+body.mv-theme .mv-tarot-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .9s cubic-bezier(.2,.7,.17,1)}
+body.mv-theme .mv-tarot--reveal .mv-tarot-inner{animation:mv-turn 1.05s cubic-bezier(.2,.75,.2,1) both}
+body.mv-theme .mv-tarot-face,body.mv-theme .mv-tarot-back{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;overflow:hidden;border:2px solid var(--rc);box-shadow:0 15px 45px #000b,inset 0 0 0 5px #0c0e17,inset 0 0 0 7px var(--rc);background:radial-gradient(ellipse at 50% 40%,#313046,#111523 72%);}
+body.mv-theme .mv-tarot-back{display:grid;place-content:center;text-align:center;gap:25px;background:repeating-conic-gradient(from 45deg,#192034 0deg 22.5deg,#222842 22.5deg 45deg);transform:rotateY(180deg)}
+body.mv-theme .mv-card-back-star{font-size:100px;color:var(--rc);text-shadow:0 0 22px #dab36e80}
+body.mv-theme .mv-card-back-text{font-size:12px;letter-spacing:.2em;color:#f9eac8}
+body.mv-theme .mv-tarot-face{display:flex;align-items:center;flex-direction:column;text-align:center;padding:23px 17px 20px;box-sizing:border-box}
+body.mv-theme .mv-tarot-face::before{content:'';position:absolute;inset:15px;border:1px solid color-mix(in srgb,var(--rc),transparent 25%);border-radius:110px 110px 7px 7px;pointer-events:none}
+body.mv-theme .mv-tarot-face::after{content:'✧';position:absolute;top:32%;right:16px;font-size:16px;color:var(--rc);opacity:.7}
+body.mv-theme .mv-tarot-number{font-size:17px;color:var(--shine);letter-spacing:.2em}
+body.mv-theme .mv-tarot-roman{margin-top:8px;letter-spacing:.2em;font-size:11px;font-weight:700;color:var(--rc)}
+body.mv-theme .mv-tarot-emblem{position:relative;flex:1;width:100%;display:grid;place-items:center;isolation:isolate}
+body.mv-theme .mv-emblem-halo{position:absolute;width:155px;aspect-ratio:1;border:1px solid var(--rc);border-radius:50%;box-shadow:0 0 0 9px #deb6700b,0 0 0 22px #c9ae6e10,inset 0 0 22px #d8a8692f;background:radial-gradient(circle,#d6bd7725,transparent 72%);z-index:-1}
+body.mv-theme .mv-emblem-halo::after{content:'';position:absolute;inset:10px;border:1px dashed var(--rc);border-radius:50%;opacity:.55}
+body.mv-theme .mv-role-symbol{font-family:Georgia,'Segoe UI Symbol',serif;color:var(--shine);font-size:clamp(68px,16vw,96px);line-height:1;text-shadow:0 5px 0 #070b16,0 0 29px var(--rc)}
+body.mv-theme .mv-tarot-scroll{color:var(--rc);font-size:14px;letter-spacing:.36em}
+body.mv-theme .mv-tarot-name{color:var(--shine);font-size:clamp(26px,7vw,34px);font-weight:700;margin-top:8px;text-shadow:0 3px 18px var(--rc)}
+body.mv-theme .mv-tarot-bottom{font-size:8px;letter-spacing:.13em;color:var(--rc);margin-top:13px}
+body.mv-theme .mv-tarot--compact{width:115px;margin:0 auto 8px}
+body.mv-theme .mv-tarot--compact .mv-tarot-face{padding:14px 6px 12px}
+body.mv-theme .mv-tarot--compact .mv-emblem-halo{width:63px}
+body.mv-theme .mv-tarot--compact .mv-role-symbol{font-size:42px}
+body.mv-theme .mv-tarot--compact .mv-tarot-roman,body.mv-theme .mv-tarot--compact .mv-tarot-bottom{display:none}
+body.mv-theme .mv-tarot--compact .mv-tarot-number{font-size:11px}
+body.mv-theme .mv-tarot--compact .mv-tarot-scroll{font-size:10px}
+body.mv-theme .mv-tarot--compact .mv-tarot-name{font-size:17px}
+body.mv-theme #online-role-reveal .online-role-card{background:none!important;border:0!important;box-shadow:none!important;padding:0!important}
+body.mv-theme #online-role-reveal .online-role-card>strong{position:absolute;clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+body.mv-theme #online-my-role-description{max-width:450px;margin:0 auto 18px;color:#f0e3ce;text-align:center;line-height:1.8}
+body.mv-theme .mv-role-reveal-heading{text-align:center;color:#e7c98d!important}
+body.mv-theme .mv-offline-role-heading{font-size:19px;text-align:center}
+@keyframes mv-turn{0%{transform:rotateY(180deg) scale(.89);opacity:.7}65%{opacity:1}100%{transform:rotateY(0) scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){body.mv-theme .mv-tarot--reveal .mv-tarot-inner{animation:none!important}}
+
+/* ===== Stage 3: unified night, day, discussion and vote UI ===== */
+body.mv-theme[data-scene="night"]{background:radial-gradient(ellipse at 50% -10%,#41465d 0%,#13182a 49%,#080a11 100%)!important}
+body.mv-theme[data-scene="day"]{background:radial-gradient(ellipse at 50% -10%,#655341 0%,#30283a 43%,#10101b 100%)!important}
+body.mv-theme[data-scene="victory"]{background:radial-gradient(ellipse at 50% -10%,#574128 0%,#231827 50%,#080b13 100%)!important}
+body.mv-theme[data-scene="night"] .game-card{border-color:#8f93c0!important}
+body.mv-theme[data-scene="day"] .game-card{border-color:#c7a36c!important}
+body.mv-theme .mv-target-grid,body.mv-theme .choice-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 22px}
+body.mv-theme .mv-target-grid:empty{display:none}
+body.mv-theme .mv-target-card,body.mv-theme .choice-button.mv-person-choice{min-width:0;width:100%;min-height:142px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:12px 8px!important;border:1px solid #93805f!important;border-radius:14px!important;background:radial-gradient(ellipse at 50% 5%,#384157,#171d2e 80%)!important;color:#f5e6c8!important;box-shadow:inset 0 0 0 3px #1a1923,0 10px 22px #0006!important;transition:transform .18s,border-color .18s,filter .18s!important;position:relative}
+body.mv-theme .mv-target-card:hover:not(:disabled),body.mv-theme .choice-button.mv-person-choice:hover:not(:disabled){transform:translateY(-3px);border-color:#e9c788!important;filter:brightness(1.1)}
+body.mv-theme .mv-target-card.is-selected{border:2px solid #ffe0a1!important;background:radial-gradient(ellipse at 50% 5%,#6d533c,#252035 84%)!important;box-shadow:0 0 0 2px #bf9d62,0 0 26px #d7aa5b45!important}
+body.mv-theme .mv-target-card:disabled{opacity:.48;cursor:not-allowed}
+body.mv-theme .mv-target-symbol,body.mv-theme .mv-person-avatar{display:grid;place-items:center;width:62px;height:66px;border:1px solid #c6aa78;border-radius:38px 38px 13px 13px;background:linear-gradient(#344054,#131827);font-size:36px;line-height:1;color:#e8cc91;text-shadow:0 0 18px #ead09677}
+body.mv-theme .mv-target-name,body.mv-theme .mv-person-name{font-weight:800;font-size:15px;line-height:1.3;overflow-wrap:anywhere;text-align:center}
+body.mv-theme .mv-target-number{position:absolute;top:9px;left:12px;color:#c8b184;font:11px Georgia,serif}
+body.mv-theme .mv-person-action{position:absolute;right:10px;top:8px;color:#bba274}
+body.mv-theme select.mv-target-fallback{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;border:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;white-space:nowrap!important}
+body.mv-theme .online-chat-panel{border:1px solid #a78a57!important;background:linear-gradient(145deg,#2b2933,#161b29)!important;box-shadow:inset 0 1px #f8e4bd17,0 14px 35px #0006;padding:16px!important;border-radius:16px!important}
+body.mv-theme .online-chat-messages{background:radial-gradient(ellipse at top,#222c3b,#111620 88%)!important;border:1px solid #514c46;border-radius:12px!important}
+body.mv-theme .online-chat-bubble{background:#333747!important;border:1px solid #615e68;border-radius:13px 13px 13px 3px!important}
+body.mv-theme .online-chat-bubble.is-mine{background:#554333!important;border-color:#96764c;border-radius:13px 13px 3px 13px!important}
+body.mv-theme .online-chat-author{color:#f5d79a!important}
+body.mv-theme #online-discussion-timer{font:700 clamp(35px,9vw,54px) Georgia,serif!important;letter-spacing:.08em;color:#f8d68f;text-align:center;text-shadow:0 0 20px #ecbe7855;padding:14px;border:1px solid #8a7757;border-radius:12px;background:#151924;margin:12px auto}
+body.mv-theme #online-chat-input{background:#141a26!important;color:#fff2d9!important;border-color:#8f7b58!important}
+body.mv-theme #online-vote-screen>h2,body.mv-theme #online-night-screen>h2{text-align:center}
+@media(max-width:380px){body.mv-theme .mv-target-grid,body.mv-theme .choice-list{gap:8px}body.mv-theme .mv-target-card,body.mv-theme .choice-button.mv-person-choice{min-height:125px;padding:10px 6px!important}body.mv-theme .mv-target-symbol,body.mv-theme .mv-person-avatar{width:51px;height:55px;font-size:30px}}
+
+/* ========== Stage 4 / Victory & Reflection ========== */
+.mv-finale{--mv-win:#d8b778;color:#f6ebd2;max-width:780px;margin:auto;animation:mv-finale-appear .7s ease both}
+.mv-finale[data-winner="wolf"]{--mv-win:#d77883}.mv-finale[data-winner="third"]{--mv-win:#bca4f2}
+.mv-finale-hero{text-align:center;padding:38px 20px;margin-bottom:20px;position:relative;overflow:hidden;border:1px solid var(--mv-win);border-radius:20px;background:radial-gradient(ellipse at 50% -20%,#5d4f3b80,transparent 65%),linear-gradient(160deg,#222434,#111721);box-shadow:0 20px 44px #0006}
+.mv-finale-sigil{width:82px;height:82px;display:grid;place-items:center;border:1px solid var(--mv-win);border-radius:50%;font-size:50px;margin:0 auto 20px;color:var(--mv-win);box-shadow:0 0 36px #b99c5940;animation:mv-sigil-appear 1.2s ease both}
+.mv-finale-hero p:first-of-type{font-size:11px;letter-spacing:.23em;color:#dbcaab}
+.mv-finale-hero h2{font-size:clamp(26px,6vw,40px);color:var(--mv-win);margin:12px 0;text-shadow:0 3px 22px #0008}
+.mv-finale-hero p:last-child{color:#d5c5ad;font-size:13px}
+.mv-finale-panel{border:1px solid #68593f;border-radius:16px;padding:20px 16px;margin:16px 0;background:linear-gradient(145deg,#202637,#131a26)}
+.mv-finale-panel h3{color:#f4dca5;margin:0 0 18px;font-size:20px}
+.mv-finale-role-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.mv-finale-person{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid #5f5649;background:#101827}
+.mv-finale-person-mark{color:#e0bf81;font-size:25px;display:grid;place-items:center;width:42px;height:45px;border:1px solid #655333;border-radius:9px;flex-shrink:0}
+.mv-finale-person>div{flex:1;min-width:0;display:grid;gap:4px}.mv-finale-person strong{color:#fff4d5;overflow-wrap:anywhere}.mv-finale-person small{color:#c2b398;font-size:12px}.mv-finale-state{font-size:12px;color:#f1d9ae;white-space:nowrap}
+.mv-finale-day{border:1px solid #756342;border-radius:12px;margin:10px 0;background:#141c2b;overflow:hidden}.mv-finale-day summary{cursor:pointer;padding:14px 16px;font-weight:700;color:#efdbb4}.mv-finale-day[open] summary{background:#373328}
+.mv-finale-logline{display:grid;grid-template-columns:88px 1fr;gap:12px;padding:10px 15px;border-bottom:1px solid #3b3c42;font-size:14px;line-height:1.7}.mv-finale-logline strong{color:#dabe86}.mv-finale-logline span{color:#f5eddc}.mv-finale-votes{font-size:13px;line-height:1.8;color:#d9cfbd;padding:0 15px;overflow-wrap:anywhere}
+.mv-finale-again{width:100%;padding:17px!important;margin-top:10px!important;background:linear-gradient(120deg,#9e7d43,#e8c988)!important;color:#171a21!important;border:1px solid #f6ddaa!important;border-radius:12px!important;font-weight:800!important}
+@keyframes mv-finale-appear{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}@keyframes mv-sigil-appear{from{opacity:0;transform:rotate(-35deg) scale(.6)}to{opacity:1;transform:none}}
+/* Online stage-four visual harmony: keep the existing Firebase-driven review */
+body.mv-theme #online-game-over-screen .online-finale-header{background:radial-gradient(ellipse at 50% -18%,#72573888,transparent 65%),linear-gradient(160deg,#222434,#111721);border-color:#a58a59}
+body.mv-theme #online-game-over-screen .online-finale-emblem{color:#e4bf7e;border-color:#bb965d}
+body.mv-theme #online-game-over-screen .online-finale-section{background:linear-gradient(145deg,#202637,#131a26);border-color:#68593f}
+body.mv-theme #online-game-over-screen .online-review-day{border-color:#756342;background:#141c2b}
+body.mv-theme #online-game-over-screen .online-review-day[open] summary{background:#373328}
+body.mv-theme #online-game-over-screen .online-result-player{background:#101827;border-color:#5f5649}
+/* Exit modal shared night-gold palette */
+.mv-exit-modal[hidden]{display:none!important}.mv-exit-modal{position:fixed;inset:0;z-index:100000;padding:18px;background:#050812d9;display:grid;place-items:center;backdrop-filter:blur(5px)}
+.mv-exit-dialog{width:min(100%,430px);padding:28px 22px;border:1px solid #aa8c5b;border-radius:19px;text-align:center;background:linear-gradient(155deg,#283044,#141a27);box-shadow:0 20px 60px #000a}
+.mv-exit-dialog-icon{width:60px;height:60px;margin:0 auto 14px;border-radius:50%;border:1px solid #ac8b54;display:grid;place-items:center;color:#eac98b;font-size:38px}.mv-exit-dialog h2{font-size:23px;color:#f4dca5}.mv-exit-dialog p{line-height:1.8;color:#ddd0b8}.mv-exit-actions{display:flex;gap:10px;margin-top:20px}.mv-exit-actions button{flex:1;min-width:0;margin:0!important;padding:13px 8px!important;border-radius:11px!important;font-size:14px!important}.mv-exit-actions [data-exit-cancel]{background:#323c51!important;border:1px solid #69738a!important;color:#fff!important}.mv-exit-actions [data-exit-confirm]{background:#722e3c!important;border:1px solid #cd8692!important;color:#fff!important}
+@media(max-width:420px){.mv-finale-panel{padding:16px 11px}.mv-finale-logline{grid-template-columns:72px 1fr;gap:8px}.mv-exit-actions{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.mv-finale,.mv-finale-sigil{animation:none!important}}
+
+/* ===== Stage 5: illustrated tarot cards + sound ===== */
+body.mv-theme .mv-tarot-emblem{position:relative;overflow:hidden;min-height:0;width:calc(100% + 14px);margin:8px 0 0;border-radius:100px 100px 7px 7px;isolation:isolate}
+body.mv-theme .mv-role-art{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;border-radius:100px 100px 7px 7px;filter:saturate(.87) contrast(1.06);-webkit-mask-image:linear-gradient(to bottom,#000 0 78%,transparent 100%);mask-image:linear-gradient(to bottom,#000 0 78%,transparent 100%)}
+body.mv-theme .mv-role-art:not([hidden])~.mv-role-symbol{display:none}
+body.mv-theme .mv-role-art[hidden]{display:none}
+body.mv-theme .mv-tarot-emblem:has(.mv-role-art:not([hidden])) .mv-emblem-halo{display:none}
+body.mv-theme .mv-tarot-face{padding-bottom:18px}
+body.mv-theme .mv-tarot--compact .mv-role-art{border-radius:55px 55px 6px 6px}
+body.mv-theme .mv-sound-controls{display:flex;justify-content:center;margin:13px auto 2px}
+body.mv-theme #mv-sound-toggle{width:auto!important;min-width:178px;min-height:38px;margin:0!important;padding:8px 14px!important;border-radius:24px!important;border:1px solid #a78d60!important;background:#1a2130!important;color:#efdaad!important;font-size:12px!important;box-shadow:none!important}
+body.mv-theme #mv-sound-toggle[aria-pressed="true"]{background:#57452a!important;border-color:#ebcb83!important;color:#fff2cb!important}
+body.mv-theme #back-to-game-mode-online{display:none!important}
+
+/* Player identity system — characterless default avatar + color-coded name */
+body.mv-theme .mv-target-card, body.mv-theme .choice-button.mv-person-choice{
+ --player-color:#f2c57f;min-height:125px!important;gap:12px!important;
+}
+body.mv-theme .mv-avatar-default{
+ display:inline-block;position:relative;flex:none;box-sizing:border-box;
+ width:56px;height:56px;border:2px solid var(--player-color,#e8cc91);border-radius:50%;
+ background:radial-gradient(circle at 45% 25%,#263b50,#0c1421 78%);
+ box-shadow:inset 0 0 0 3px #131927,0 0 15px color-mix(in srgb,var(--player-color),transparent 82%);
+ overflow:hidden;
+}
+body.mv-theme .mv-avatar-head{display:block;position:absolute;top:10px;left:20px;width:15px;height:15px;border-radius:50%;background:var(--player-color)}
+body.mv-theme .mv-avatar-body{display:block;position:absolute;left:11px;bottom:7px;width:31px;height:22px;border-radius:50% 50% 25% 25%;background:var(--player-color)}
+body.mv-theme .mv-target-name,body.mv-theme .mv-person-name{
+ color:var(--player-color,#f2d9a9)!important;font-size:clamp(17px,4.5vw,22px)!important;
+ font-weight:900!important;text-align:center;overflow-wrap:anywhere;text-shadow:0 1px 12px #000b;
+}
+body.mv-theme .mv-target-number{display:none!important}
+body.mv-theme .mv-target-card.is-selected{box-shadow:0 0 0 2px var(--player-color),0 0 22px #d6b36a44!important}
+body.mv-theme #online-discussion-members .online-member{font-size:16px}
+body.mv-theme .mv-chat-entry{display:flex;align-items:flex-start;gap:10px;max-width:95%;--player-color:#f2c57f}
+body.mv-theme .mv-chat-entry.is-mine{align-self:flex-end;flex-direction:row-reverse}
+body.mv-theme .mv-chat-entry .mv-avatar-default{width:43px;height:43px}
+body.mv-theme .mv-chat-entry .mv-avatar-head{left:15px;top:7px;width:12px;height:12px}
+body.mv-theme .mv-chat-entry .mv-avatar-body{left:8px;bottom:6px;width:24px;height:17px}
+body.mv-theme .mv-chat-content{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+body.mv-theme .mv-chat-entry.is-mine .mv-chat-content{align-items:flex-end}
+body.mv-theme .mv-chat-entry .online-chat-author{font-size:clamp(16px,4.3vw,20px)!important;font-weight:900;color:var(--player-color)!important;letter-spacing:.015em}
+body.mv-theme .mv-chat-entry .online-chat-bubble{max-width:100%;width:auto;padding:10px 13px}
+body.mv-theme .mv-chat-entry .online-chat-bubble p{font-size:14px;line-height:1.65;margin:0;color:#fff7e8}
+@media(max-width:400px){body.mv-theme .mv-target-card .mv-avatar-default,body.mv-theme .choice-button.mv-person-choice .mv-avatar-default{width:50px;height:50px}}
+
+body.mv-theme .mv-discussion-member{display:flex;align-items:center;gap:12px}
+body.mv-theme .mv-discussion-member .mv-avatar-default{width:42px;height:42px}
+body.mv-theme .mv-discussion-member .mv-avatar-head{top:7px;left:14px;width:12px;height:12px}
+body.mv-theme .mv-discussion-member .mv-avatar-body{left:8px;bottom:6px;width:23px;height:17px}
+body.mv-theme .mv-discussion-member strong{color:var(--player-color);font-size:19px;font-weight:900;margin-right:auto}
+
+/* ======================================================
+   Player identity refinement — approved visual direction
+   The player's actual typed name is rendered by script.js / online.js.
+   Keep role artwork separate from neutral player avatars.
+   ====================================================== */
+body.mv-theme {
+  --mv-player-surface: #111a28;
+  --mv-player-outline: rgba(194,170,124,.42);
+}
+/* Keep all selection cards rectangular, no illustrated character or numbered tarot tile. */
+body.mv-theme .mv-target-grid {align-items:stretch}
+body.mv-theme .mv-target-card,
+body.mv-theme .choice-button.mv-person-choice {
+  min-height:106px!important;
+  display:flex!important;
+  flex-direction:row!important;
+  justify-content:flex-start!important;
+  align-items:center!important;
+  gap:13px!important;
+  text-align:left!important;
+  padding:15px 16px!important;
+  border-radius:13px!important;
+  background:linear-gradient(140deg,#172232,#0d1521)!important;
+  border:1px solid var(--mv-player-outline)!important;
+}
+body.mv-theme .mv-target-card .mv-avatar-default,
+body.mv-theme .choice-button.mv-person-choice .mv-avatar-default {
+  width:54px;height:54px;flex:0 0 54px;
+}
+body.mv-theme .mv-target-card .mv-target-name,
+body.mv-theme .choice-button.mv-person-choice .mv-person-name {
+  margin:0!important;
+  font-size:clamp(18px,4.4vw,24px)!important;
+  line-height:1.32!important;
+  color:var(--player-color,#e8cc91)!important;
+  text-align:left!important;
+  letter-spacing:.025em;
+}
+body.mv-theme .mv-target-card.is-selected {
+  background:linear-gradient(140deg,#333229,#18202d)!important;
+  border:2px solid #ffdda0!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--player-color,#f2c57f),transparent 55%),
+             0 0 22px rgba(244,205,134,.22)!important;
+}
+body.mv-theme .mv-avatar-default {color:var(--player-color,#e8cc91)}
+body.mv-theme .mv-chat-entry .online-chat-author,
+body.mv-theme .mv-discussion-member strong {
+  color:var(--player-color,#f2c57f)!important;
+  font-size:clamp(18px,4.4vw,23px)!important;
+  font-weight:900!important;
+  overflow-wrap:anywhere;
+}
+body.mv-theme .mv-chat-entry .online-chat-bubble,
+body.mv-theme .mv-discussion-member {
+  border-radius:12px;
+}
+/* Never resurrect the unwanted return-to-mode control. */
+body.mv-theme #back-to-game-mode-online {display:none!important}
+/* Preserve readable labels and touch targets on narrow phones. */
+@media (max-width:420px) {
+  body.mv-theme .mv-target-grid,
+  body.mv-theme .choice-list {grid-template-columns:1fr;gap:9px}
+  body.mv-theme .mv-target-card,
+  body.mv-theme .choice-button.mv-person-choice {
+    min-height:79px!important;
+    padding:10px 13px!important;
+  }
+  body.mv-theme .mv-target-card .mv-avatar-default,
+  body.mv-theme .choice-button.mv-person-choice .mv-avatar-default {
+    width:48px;height:48px;flex-basis:48px;
+  }
+  body.mv-theme .mv-target-card .mv-avatar-head,
+  body.mv-theme .choice-button.mv-person-choice .mv-avatar-head {
+    left:17px;top:9px;width:13px;height:13px;
+  }
+  body.mv-theme .mv-target-card .mv-avatar-body,
+  body.mv-theme .choice-button.mv-person-choice .mv-avatar-body {
+    left:9px;bottom:6px;width:27px;height:19px;
+  }
+}
+
+/* Approved illustrated role cards: one complete artwork per role, no duplicate framing. */
+body.mv-theme .mv-tarot{aspect-ratio:1/2;width:min(100%,244px)}
+body.mv-theme .mv-tarot--compact{width:106px}
+body.mv-theme .mv-tarot--fullart .mv-tarot-face{padding:0!important;overflow:hidden;border:0!important;background:#0c1018!important;box-shadow:0 10px 30px #0009!important}
+body.mv-theme .mv-tarot--fullart .mv-tarot-face::before,body.mv-theme .mv-tarot--fullart .mv-tarot-face::after{display:none!important}
+body.mv-theme .mv-tarot--fullart .mv-tarot-face>*:not(.mv-full-card-image){display:none!important}
+body.mv-theme .mv-full-card-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+body.mv-theme .mv-full-card-image[hidden]{display:none}
+body.mv-theme .mv-tarot:not(.mv-tarot--fullart) .mv-full-card-image{display:none}

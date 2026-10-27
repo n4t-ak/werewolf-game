@@ -1,91 +1,39 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>人狼ゲーム</title>
-  <link rel="stylesheet" href="./style.css">
-  <script src="./script.js" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c101d">
+  <title>人狼ゲーム | WEREWOLF</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="theme.css?v=cards-20261027">
+  <script src="role-card.js?v=cards-20261027" defer></script>
+  <script src="script.js?v=stage5" defer></script>
+  <script src="audio.js?v=stage5" defer></script>
 </head>
-<body>
-  <!-- ゲームモード選択 -->
-  <div id="game-mode-screen">
-    <div class="game-mode-panel">
-      <h1>人狼ゲーム</h1>
-      <p>ゲームモードを選択してください</p>
-      <a href="./online.html" class="game-mode-btn online-mode-btn">
-        オンラインで遊ぶ
-      </a>
-      <button id="single-device-mode" class="game-mode-btn single-mode-btn" type="button">
-        一台で遊ぶ
-      </button>
-    </div>
-  </div>
-
-  <!-- オフラインの人数選択画面でのみ表示 -->
-  <button id="back-to-game-mode" type="button" hidden>
-    ← ゲームモード選択に戻る
-  </button>
-
-  <div class="app-shell">
+<body class="mv-theme" data-scene="lobby">
+  <main class="app-shell">
     <header class="app-header">
-      <div class="brand-mark">☾</div>
+      <div class="brand-mark" aria-hidden="true">☾</div>
+      <p class="eyebrow">ONE DEVICE · ALL PLAYERS</p>
       <h1>人狼ゲーム</h1>
       <p class="subtitle">闇に潜む人狼を見つけ出せ。</p>
-    </header>
-    <main class="game-card">
+      <div class="mv-sound-controls"><button id="mv-sound-toggle" type="button" aria-pressed="false">♪ 音楽・効果音：オフ</button></div>
+</header>
+    <nav class="mv-mode-nav" aria-label="ゲームモード"><a href="./index.html" aria-current="page">☽ 1台で遊ぶ</a><a href="./online.html">✦ オンラインで遊ぶ</a></nav>
+    <section class="game-card" aria-label="ゲーム操作">
       <div id="game">
         <h2>プレイヤー数を選択</h2>
         <p>3〜20人でゲームを開始できます。</p>
-        <label class="field-label" for="count">参加人数</label>
-        <div class="count-selector">
-          <button id="initial-count-minus" class="count-adjust" type="button">−</button>
-          <div class="count-display">
-            <input type="number" id="count" min="3" max="20" value="6">
-            <span>人</span>
-          </div>
-          <button id="initial-count-plus" class="count-adjust" type="button">＋</button>
+        <label for="count" class="field-label">参加人数</label>
+        <div class="number-field">
+          <input type="number" id="count" min="3" max="20" step="1" value="5" inputmode="numeric">
+          <span>人</span>
         </div>
         <button id="start" type="button">次へ進む →</button>
       </div>
-    </main>
-  </div>
-
-  <script>
-    (() => {
-      const modeScreen = document.getElementById("game-mode-screen");
-      const singleButton = document.getElementById("single-device-mode");
-      const backButton = document.getElementById("back-to-game-mode");
-      const game = document.getElementById("game");
-
-      function updateBackButton() {
-        const showingModeSelection = !modeScreen.hidden;
-        const showingPlayerCount = !!game.querySelector(".count-selector");
-        const shouldShow = !showingModeSelection && showingPlayerCount;
-        if (backButton.hidden === shouldShow) {
-          backButton.hidden = !shouldShow;
-        }
-      }
-
-      singleButton.addEventListener("click", () => {
-        modeScreen.hidden = true;
-        updateBackButton();
-      });
-
-      backButton.addEventListener("click", () => {
-        modeScreen.hidden = false;
-        updateBackButton();
-      });
-
-      const observer = new MutationObserver(updateBackButton);
-      observer.observe(game, {
-        childList: true,
-        subtree: true
-      });
-
-      updateBackButton();
-    })();
-  </script>
+    </section>
+    <footer class="app-footer">PASS THE PHONE · KEEP YOUR ROLE SECRET</footer>
+  </main>
 </body>
 </html>

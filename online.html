@@ -8,6 +8,7 @@
   <title>オンライン人狼</title>
   
 <link rel="stylesheet" href="./style.css?v=20261023-2">
+<link rel="stylesheet" href="./theme.css?v=cards-20261027">
 
 <style>
   /* 投票スキップボタンと確認ダイアログ：このページに限定 */
@@ -164,12 +165,14 @@
 #online-night-result:not(:empty){display:block;white-space:pre-line;background:#223450;border:1px solid #59739b;border-radius:12px;padding:14px;color:#fff;line-height:1.8}
 @media(max-width:400px){.online-chat-panel{padding:10px}.online-chat-messages{height:260px}#online-chat-send{padding:10px 12px}}
 </style>
+  <script src="./audio.js?v=stage5" defer></script>
 </head>
-<body>
+<body class="mv-theme" data-scene="lobby">
 
 
 
-<script type="module" src="./online.js?v=20261024-chat-thief"></script>
+<script src="./role-card.js?v=cards-20261027" defer></script>
+<script type="module" src="./online.js?v=stage5"></script>
 
 
 
@@ -177,10 +180,14 @@
 
   <main class="app-shell">
     <header class="app-header">
+      <div class="mv-emblem" aria-hidden="true">☾</div>
+      <p class="mv-kicker">MOONLIT VILLAGE · ONLINE</p>
       <h1>オンライン人狼</h1>
       <p class="subtitle">自分のスマホからルームに参加</p>
-    </header>
+      <div class="mv-sound-controls"><button id="mv-sound-toggle" type="button" aria-pressed="false">♪ 音楽・効果音：オフ</button></div>
+</header>
 
+    <nav id="online-mode-nav" class="mv-mode-nav" aria-label="ゲームモード"><a href="./index.html">☽ 1台で遊ぶ</a><a href="./online.html" aria-current="page">✦ オンラインで遊ぶ</a></nav>
     <section class="game-card">
       <div id="online-game">
 
@@ -249,17 +256,16 @@
             招待リンクをコピー
           </button>
 
+          <button id="online-leave-room" type="button" class="online-leave-room">
+            ルームから退出
+          </button>
+
           <h3 id="member-count">参加者</h3>
           <div id="online-members"></div>
 
           <p id="lobby-notice">
             全員が参加するまで待ってください。
           </p>
-
-          <div class="online-lobby-replay-note">
-            <strong>このルームで続けて遊べます</strong>
-            <p>参加メンバーとルーム番号を引き継ぎます。ホストは役職や詳細設定を変更でき、新しい参加者も招待できます。</p>
-          </div>
           <button id="online-last-game-review" type="button" hidden class="online-subtle-action">前回の結果を振り返る</button>
           <section id="online-last-game-panel" class="online-last-game-panel" hidden>
             <h3 id="online-last-winner">前回の結果</h3>
@@ -366,6 +372,7 @@
         <div id="online-role-reveal" hidden>
           <h3>あなたの役職</h3>
           <div class="online-role-card">
+            <div id="online-tarot-role" aria-live="polite"></div>
             <strong id="online-my-role">確認中...</strong>
             <p id="online-my-role-description"></p>
           </div>
@@ -400,7 +407,8 @@
             <label class="field-label" for="online-night-target">
               行動する相手
             </label>
-            <select id="online-night-target">
+            <div id="mv-night-candidates" class="mv-target-grid" aria-label="夜の行動対象"></div>
+            <select id="online-night-target" class="mv-target-fallback">
               <option value="">相手を選択してください</option>
             </select>
             <button id="online-submit-night" type="button">
@@ -483,7 +491,8 @@
   <label class="field-label" for="online-vote-target">
     投票先
   </label>
-  <select id="online-vote-target">
+  <div id="mv-vote-candidates" class="mv-target-grid" aria-label="投票先の候補"></div>
+  <select id="online-vote-target" class="mv-target-fallback">
     <option value="">プレイヤーを選択</option>
   </select>
   <button id="online-submit-vote" type="button">
@@ -544,7 +553,7 @@
           <section class="online-finale-actions">
             <button id="online-play-again" type="button" hidden>↻ もう一度遊ぶ・ロビーへ戻る</button>
             <p id="online-restart-wait" hidden>ホストが「もう一度遊ぶ」を押すと、全員が自動で同じロビーに戻ります。</p>
-            <a href="./index.html" class="online-finale-exit">ゲームモード選択へ戻る</a>
+
           </section>
         </div>
 
@@ -557,40 +566,9 @@
   </main>
 
   <!-- ルーム選択・作成・参加時のみ表示 -->
-  
-<a href="./index.html" id="back-to-game-mode-online" hidden>
-  ← ゲームモード選択に戻る
-</a>
 
 
   <!-- Firebase・オンラインゲーム処理 -->
-
-
-
-  <!-- 戻るボタンの表示制御 -->
-  <script>
-    (() => {
-      const backButton = document.getElementById("back-to-game-mode-online");
-      const entryScreen = document.getElementById("entry-screen");
-
-      if (!backButton || !entryScreen) return;
-
-      function updateBackButton() {
-        const shouldHide = entryScreen.hidden;
-        if (backButton.hidden !== shouldHide) {
-          backButton.hidden = shouldHide;
-        }
-      }
-
-      const observer = new MutationObserver(updateBackButton);
-      observer.observe(entryScreen, {
-        attributes: true,
-        attributeFilter: ["hidden"]
-      });
-
-      updateBackButton();
-    })();
-  </script>
   <div id="vote-skip-confirm-modal" class="confirm-modal" hidden role="presentation">
   <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="vote-skip-confirm-title" aria-describedby="vote-skip-confirm-description">
     <div class="confirm-modal-symbol" aria-hidden="true">!</div>
@@ -617,6 +595,28 @@
         スキップする
       </button>
     </div>
+  </div>
+</div>
+<script>
+(() => {
+ const sceneByScreen={
+  'online-night-screen':'night','online-role-reveal':'night',
+  'online-day-screen':'day','online-discussion-screen':'day',
+  'online-vote-screen':'day','online-vote-result-screen':'victory',
+  'online-game-over-screen':'victory'
+ };
+ function syncScene(){let scene='lobby';for(const [id,value] of Object.entries(sceneByScreen)){const element=document.getElementById(id);if(element&&!element.hidden){scene=value;break;}}document.body.dataset.scene=scene;}
+ const root=document.getElementById('online-game');
+ if(root){new MutationObserver(syncScene).observe(root,{subtree:true,attributes:true,attributeFilter:['hidden']});syncScene();}
+})();
+</script>
+<!-- 第4段階：退出時の確認（ロビーのみ） -->
+<div id="mv-exit-modal" class="mv-exit-modal" hidden>
+  <div class="mv-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="mv-exit-title">
+    <div class="mv-exit-dialog-icon" aria-hidden="true">☾</div>
+    <h2 id="mv-exit-title">村を離れますか？</h2>
+    <p data-exit-message></p>
+    <div class="mv-exit-actions"><button type="button" data-exit-cancel>この部屋に残る</button><button type="button" data-exit-confirm>退出する</button></div>
   </div>
 </div>
 </body>

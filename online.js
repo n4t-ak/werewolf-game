@@ -16,7 +16,6 @@ const extras = [
 let room = null, uid = null, data = null, offRoom = null, currentView = '', busy = false;
 let entryView = 'menu', timer = null, savedSettings = '', lastRenderedPhase = '';
 const roomRef = field => ref(db, field?.startsWith('rooms/') ? field : `rooms/${room}${field ? '/' + field : ''}`);
-// ルーム基準の相対パス。roomRef() と update(roomRef(''), patch) の両方で使用する。
 const roundField = (field, day = data?.meta?.round || 1) => `rounds/${day}${field ? '/' + field : ''}`;
 const myRole = () => data?.roles?.[uid] || '';
 const host = () => !!uid && data?.meta?.hostUid === uid;
@@ -30,9 +29,84 @@ const setting = k => data?.settings?.extras?.[k] === true;
 const thisRound = () => data?.rounds?.[round()] || {};
 const notification = txt => { $('online-status').textContent = txt || ''; };
 const esc = txt => String(txt ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const renderList = (element, rows) => { element.replaceChildren(); for (const row of rows) {const el = document.createElement('div');el.className = 'online-member';const a=document.createElement('strong');a.textContent=row[0];const b=document.createElement('span');b.textContent=row[1];el.append(a,b);element.append(el);} };
+// プレイヤーの色は参加順に固定（同名でもUIDで識別）
+const mvPlayerColors = ['#f2c57f','#80caff','#fb8792','#8ee5ab','#c8a5fc','#ffbb87','#80e2d8','#f2a6cf'];
+function mvPlayerColor(playerId){
+  const ordered=Object.entries(members()).sort((a,b)=>(a[1].joinedAt||0)-(b[1].joinedAt||0)||a[0].localeCompare(b[0]));
+  const index=ordered.findIndex(([id])=>id===playerId);
+  return mvPlayerColors[(index<0?0:index)%mvPlayerColors.length];
+}
+function mvAvatar(){
+  const icon=document.createElement('span');
+  icon.className='mv-avatar-default';
+  icon.setAttribute('aria-hidden','true');
+  const head=document.createElement('span');head.className='mv-avatar-head';
+  const body=document.createElement('span');body.className='mv-avatar-body';
+  icon.append(head,body);
+  return icon;
+}
+const renderList = (element, rows) => {
+  element.replaceChildren();
+  for (const row of rows) {
+    const el=document.createElement('div');el.className='online-member';
+    const a=document.createElement('strong');a.textContent=row[0];
+    const b=document.createElement('span');b.textContent=row[1];
+    if(element.id==='online-discussion-members'){
+      const id=Object.keys(members()).find(candidate=>nameOf(candidate)===row[0]);
+      if(id){el.style.setProperty('--player-color',mvPlayerColor(id));el.classList.add('mv-discussion-member');el.append(mvAvatar());}
+    }
+    el.append(a,b);element.append(el);
+  }
+};
 const setView = id => { for (const screen of screens) {const el=$(screen);if(el)el.hidden=screen!==id;} if(id!==currentView) { currentView=id; if(id==='entry-screen') switchEntry(entryView); } };
-const opt = (select, candidates, label='相手を選択してください') => {const old=select.value;select.replaceChildren(new Option(label,''));for(const u of candidates)select.add(new Option(nameOf(u),u));if(candidates.includes(old))select.value=old;};
+const opt = (select, candidates, label='相手を選択してください') => {
+  const previous=select.value;
+  const present=Array.from(select.options).slice(1).map(o=>o.value);
+  const changed=present.length!==candidates.length || present.some((id,i)=>id!==candidates[i]);
+  if(changed){
+    select.replaceChildren(new Option(label,''));
+    for(const id of candidates)select.add(new Option(nameOf(id),id));
+    if(candidates.includes(previous))select.value=previous;
+  }
+};
+function renderPlayerCards(selectId, holderId){
+  const select=$(selectId), holder=$(holderId);
+  if(!select||!holder)return;
+  const candidates=Array.from(select.options).filter(o=>o.value);
+  const signature=candidates.map(o=>o.value+':'+o.textContent+':'+mvPlayerColor(o.value)).join('|');
+  if(holder.dataset.signature!==signature){
+    const fragment=document.createDocumentFragment();
+    candidates.forEach((option,i)=>{
+      const button=document.createElement('button');
+      button.type='button'; button.className='mv-target-card';
+      button.dataset.target=option.value;
+      const icon=mvAvatar();
+      const name=document.createElement('span');name.className='mv-target-name';name.textContent=option.textContent;
+      button.style.setProperty('--player-color',mvPlayerColor(option.value));
+      button.append(icon,name);
+      button.addEventListener('click',()=>{
+        if(select.disabled)return;
+        select.value=option.value;
+        select.dispatchEvent(new Event('change',{bubbles:true}));
+        syncPlayerCards(selectId,holderId);
+      });
+      fragment.append(button);
+    });
+    holder.replaceChildren(fragment);
+    holder.dataset.signature=signature;
+  }
+  syncPlayerCards(selectId,holderId);
+}
+function syncPlayerCards(selectId,holderId){
+  const select=$(selectId),holder=$(holderId);
+  if(!select||!holder)return;
+  holder.querySelectorAll('.mv-target-card').forEach(b=>{
+    const chosen=b.dataset.target===select.value;
+    b.classList.toggle('is-selected',chosen);
+    b.setAttribute('aria-pressed',String(chosen));
+    b.disabled=select.disabled;
+  });
+}
 const randomIndex = n => {const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};
 const shuffled = a => {const b=[...a];for(let i=b.length-1;i>0;i--){const j=randomIndex(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 const voteSkipConfirmModal =
@@ -61,6 +135,7 @@ async function enterRoom(roomCode, nickname, create=false) {
  try {
   const me=await loginAnonymously();uid=me.uid;
   room=roomCode;
+  updateRoomNavigation();
   if(create){
    const meta={hostUid:uid,phase:'lobby',round:1,createdAt:Date.now()};
    const transaction=await runTransaction(roomRef('meta'),v=>v===null?meta:undefined,{applyLocally:false});
@@ -77,12 +152,87 @@ async function enterRoom(roomCode, nickname, create=false) {
   if(offRoom)offRoom();
   offRoom=onValue(roomRef(''),snap=>{if(!snap.exists()){notification('ルームが存在しません。');return;}data=snap.val();render();},err=>notification('同期エラー：'+err.message));
   notification('');
- }catch(e){console.error(e);notification('接続に失敗：'+e.message);room=null;}
+ }catch(e){console.error(e);notification('接続に失敗：'+e.message);room=null;updateRoomNavigation();}
  finally{busy=false;}
 }
 $('create-room').onclick=()=>{const n=$('online-name').value.trim();if(!n||n.length>20){notification('名前を1〜20文字で入力してください。');return;}enterRoom(String(100000+randomIndex(900000)),n,true);};
 $('join-room').onclick=()=>{const n=$('online-join-name').value.trim(),c=$('room-code').value.trim();if(!n||n.length>20){notification('名前を1〜20文字で入力してください。');return;}if(!/^\d{6}$/.test(c)){notification('6桁のルーム番号を入力してください。');return;}enterRoom(c,n);};
 $('copy-room-link').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);notification('招待リンクをコピーしました。');}catch(e){notification('コピーできませんでした。');}};
+// 世界観に合わせた退出確認モーダル。キャンセルはDBを変更しない。
+function mvConfirmExit(message) {
+  const backdrop=document.getElementById('mv-exit-modal');
+  if(!backdrop)return Promise.resolve(false);
+  const text=backdrop.querySelector('[data-exit-message]');
+  const cancel=backdrop.querySelector('[data-exit-cancel]');
+  const approve=backdrop.querySelector('[data-exit-confirm]');
+  text.textContent=message;
+  backdrop.hidden=false;
+  cancel.focus();
+  return new Promise(resolve=>{
+    let finished=false;
+    function finish(yes){if(finished)return;finished=true;backdrop.hidden=true;cancel.removeEventListener('click',no);approve.removeEventListener('click',ok);backdrop.removeEventListener('click',outside);document.removeEventListener('keydown',key);resolve(yes);}
+    const no=()=>finish(false),ok=()=>finish(true);
+    const outside=e=>{if(e.target===backdrop)no();};
+    const key=e=>{if(e.key==='Escape')no();};
+    cancel.addEventListener('click',no);approve.addEventListener('click',ok);backdrop.addEventListener('click',outside);document.addEventListener('keydown',key);
+  });
+}
+// ロビーから退出する。ホストは次の参加者へ権限を引き継ぐ。
+$('online-leave-room').onclick = async () => {
+  if (busy || !room || !uid || phase() !== 'lobby') return;
+  const others = Object.keys(members()).filter(id => id !== uid);
+  const message = host()
+    ? (others.length
+      ? 'ルームから退出しますか？ ホスト権限はほかの参加者に引き継がれます。'
+      : 'ルームから退出しますか？ 参加者がいないため部屋は解散されます。')
+    : 'ルームから退出しますか？';
+  if (!(await mvConfirmExit(message))) return;
+
+  const button = $('online-leave-room');
+  busy = true;
+  button.disabled = true;
+  try {
+    if (host()) {
+      if (others.length) {
+        // ホストの書き込み権限で両変更を一括反映する。
+        const nextHost = others.sort((a, b) =>
+          (members()[a]?.joinedAt || 0) - (members()[b]?.joinedAt || 0)
+        )[0];
+        await update(roomRef(''), {
+          'meta/hostUid': nextHost,
+          [`members/${uid}`]: null
+        });
+      } else {
+        await set(roomRef(''), null);
+      }
+    } else {
+      await set(roomRef(`members/${uid}`), null);
+    }
+
+    if (offRoom) { offRoom(); offRoom = null; }
+    room = null;
+    data = null;
+    savedSettings = '';
+    if (timer) { clearInterval(timer); timer = null; }
+    history.replaceState(null, '', location.pathname);
+    switchEntry('menu');
+    setView('entry-screen');
+    updateRoomNavigation();
+    notification('ルームから退出しました。');
+  } catch (error) {
+    console.error(error);
+    notification('退出できませんでした：' + error.message);
+  } finally {
+    busy = false;
+    button.disabled = false;
+  }
+};
+
+function updateRoomNavigation() {
+  const nav = $('online-mode-nav');
+  if (nav) nav.hidden = !!room;
+}
+
 
 // 役職人数・詳細設定
 for(const [i,r] of roleNames.entries()){
@@ -138,6 +288,7 @@ $('online-start-game').onclick=async()=>{
 };
 
 function renderReveal(){setView('online-role-reveal');const r=myRole();$('online-my-role').textContent=r||'確認中';
+ if(window.MVRoleCard && r) window.MVRoleCard.mount($('online-tarot-role'),r);
  const details={人狼:'毎晩1人を襲撃する。',狂人:'人狼陣営の味方。',占い師:'毎晩1人を占う。',騎士:'毎晩1人を護衛する。',霊媒師:'前の処刑者が人狼か調べる。',てるてる:'昼に処刑されると単独勝利。',怪盗:'初夜に他人と役職を交換できる。',村人:'議論と投票で人狼を見つける。'};
  $('online-my-role-description').textContent=details[r]||'';
  const ready=data.ready||{};const total=Object.keys(members()).length;const count=Object.values(ready).filter(Boolean).length;
@@ -176,34 +327,16 @@ function renderNight(){setView('online-night-screen');$('online-night-title').te
  const actionArea=$('online-night-action-area');actionArea.hidden=!needs||!!done[uid]||!!act;
  $('online-night-target').disabled=targets.length===0;
  $('online-submit-night').disabled=targets.length===0;
+ renderPlayerCards('online-night-target','mv-night-candidates');
  $('online-night-skip').hidden=!(r==='怪盗'&&round()===1&&living(uid)&&!done[uid]&&!act) && !(needs&&targets.length===0&&!act&&!done[uid]);
  $('online-night-done').hidden=!living(uid)||!!done[uid]||needs&&!act;
- // 初夜の怪盗本人に、交換先の役職を行動確定直後から表示する。
- // 役職の実際の交換は従来どおり朝の確定処理で行う。
- let actionResult = done[uid] ? '完了しました。他の参加者を待っています。' : act ? '行動を送信しました。' : '';
- if (r === '怪盗' && round() === 1 && act) {
-   if (act.targetUid) {
-     const gained = data.roles?.[act.targetUid] || '確認中';
-     actionResult = `交換先：${nameOf(act.targetUid)}\n交換する役職：「${gained}」\n朝の確定時にあなたの役職が「${gained}」になります。`;
-   } else {
-     actionResult = '役職は交換しませんでした。あなたは怪盗のままです。';
-   }
- }
- $('online-night-result').textContent = actionResult;
- $('online-night-result').style.whiteSpace = 'pre-line';
+ $('online-night-result').textContent=done[uid]?'完了しました。他の参加者を待っています。':act?'行動を送信しました。':' ';
  const status=countCompleted(done,alive());$('online-night-done-count').textContent=`夜の行動完了：${status.completed} / ${status.total}人`;
  $('online-go-day').hidden=!host();$('online-go-day').disabled=!status.allDone;
 }
 $('online-submit-night').onclick=async()=>{
  if(!living(uid)||phase()!=='night')return;const r=myRole(),target=$('online-night-target').value;if(!nightTargets().includes(target))return notification('相手を選択してください。');
- try{
-   const button=$('online-submit-night');button.disabled=true;
-   await set(roomRef(roundField(`nightActions/${uid}`)),{role:r,targetUid:target,at:Date.now()});
-   if(r==='怪盗' && round()===1){
-     $('online-night-result').textContent=`${nameOf(target)}と交換する役職は「${data.roles?.[target]||'確認中'}」です。`;
-   }
-   await set(roomRef(roundField(`nightDone/${uid}`)),true);
- }catch(e){notification('夜の送信：'+e.message);$('online-submit-night').disabled=false;}
+ try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:r,targetUid:target,at:Date.now()});await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('夜の送信：'+e.message);}
 };
 $('online-night-done').onclick=async()=>{if(!living(uid)||needsNightAction(myRole(),round())&&!thisRound().nightActions?.[uid])return;try{await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('完了通知：'+e.message);}};
 $('online-night-skip').onclick=async()=>{if(!living(uid))return;try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:myRole(),targetUid:'',skip:true,at:Date.now()});await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('行動スキップ：'+e.message);}};
@@ -217,8 +350,8 @@ async function resolveMorning(){
  if(r===1){const thief=Object.keys(original).find(id=>original[id]==='怪盗');const target=actions[thief]?.targetUid;
   if(thief&&target&&living(thief)&&living(target)){
    const swapped=applyThiefSwap(original,thief,target);roles=swapped.roles;
-   privateResults[thief]={type:'thief',text:`怪盗の交換成功：${nameOf(target)}さんと役職を交換しました。あなたの現在の役職は「${swapped.stolenRole}」です。`};
-   privateResults[target]={type:'stolen',text:`怪盗によって役職が交換されました。あなたの現在の役職は「怪盗」です。`};
+   privateResults[thief]={type:'thief',text:`交換した役職：${swapped.stolenRole}。${nameOf(target)}と交換しました。`};
+   privateResults[target]={type:'stolen',text:'怪盗に役職を交換されました。現在の役職は怪盗です。'};
   }
  }
  const order=Object.entries(actions).filter(([id,a])=>original[id]==='人狼'&&a?.targetUid).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([id])=>id);
@@ -240,65 +373,58 @@ function renderDay(){setView('online-day-screen');$('online-day-title').textCont
  $('online-day-notice').textContent=result?.victimUid?`${nameOf(result.victimUid)}が襲撃されました。`: '昨夜の犠牲者はいませんでした。';
  $('online-day-notice').textContent+=' '+(result?.eventText||'');
  const personal=thisRound().privateResults?.[uid]?.text;
- const firstRole=data.initialRoles?.[uid] || '';
- const swapNotice=round()===1 && firstRole && firstRole!==myRole()
-   ?`【役職変更】初夜の怪盗の交換により、あなたの役職は「${firstRole}」から「${myRole()}」になりました。`
-   :'';
- $('online-private-result').textContent=[swapNotice,personal].filter(Boolean).join('\n') || (round()===1 && firstRole==='怪盗'?'怪盗による交換はありませんでした。':'');
- $('online-private-result').style.whiteSpace='pre-line';
+ $('online-private-result').textContent=personal||'';
  renderList($('online-day-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
  $('online-start-discussion').hidden=!host();
 }
 $('online-start-discussion').onclick=async()=>{if(!host()||phase()!=='day')return;try{await update(roomRef(''),{[`rounds/${round()}/discussionStartedAt`]:Date.now(),[`rounds/${round()}/discussionTimerControls`]:{paused:false,pausedAt:0,pausedMs:0,extraMs:0},'meta/phase':'discussion'});}catch(e){notification('議論開始：'+e.message);}};
 function discussionLeft(){const r=thisRound(),base=(r.nightResult?.minutes||3)*60000,c=r.discussionTimerControls||{};const now=c.paused?c.pausedAt||Date.now():Date.now();const elapsed=Math.max(0,now-(r.discussionStartedAt||now)-(c.pausedMs||0));return Math.max(0,base+(c.extraMs||0)-elapsed);}
 function renderTimer(){if(phase()!=='discussion')return;const sec=Math.ceil(discussionLeft()/1000);$('online-discussion-timer').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;}
+function renderDiscussionChat(){
+ const holder=$('online-chat-messages');if(!holder)return;
+ const chat=thisRound().chat||{};
+ const records=Object.entries(chat).filter(([,m])=>m&&typeof m.text==='string'&&members()[m.uid]);
+ records.sort((a,b)=>(a[1].at||0)-(b[1].at||0)||a[0].localeCompare(b[0]));
+ const signature=records.map(([id,m])=>id+':'+m.uid+':'+m.text).join('|');
+ if(holder.dataset.signature!==signature){
+   const stickToBottom=holder.scrollHeight-holder.scrollTop-holder.clientHeight<75;
+   holder.replaceChildren();
+   if(!records.length){const empty=document.createElement('p');empty.className='online-chat-empty';empty.textContent='まだ発言がありません。';holder.append(empty);}
+   for(const [,msg] of records){
+     const item=document.createElement('div');item.className='mv-chat-entry';
+     item.style.setProperty('--player-color',mvPlayerColor(msg.uid));
+     if(msg.uid===uid)item.classList.add('is-mine');
+     const avatar=mvAvatar();
+     const content=document.createElement('div');content.className='mv-chat-content';
+     const author=document.createElement('strong');author.className='online-chat-author';author.textContent=nameOf(msg.uid)+(msg.uid===uid?'（あなた）':'');
+     const bubble=document.createElement('div');bubble.className='online-chat-bubble';
+     const text=document.createElement('p');text.textContent=msg.text;bubble.append(text);
+     content.append(author,bubble);item.append(avatar,content);holder.append(item);
+   }
+   holder.dataset.signature=signature;
+   if(stickToBottom)holder.scrollTop=holder.scrollHeight;
+ }
+ const allowed=living(uid)&&phase()==='discussion';
+ $('online-chat-input').disabled=!allowed;
+ $('online-chat-send').disabled=!allowed;
+ $('online-chat-notice').textContent=allowed?'生存者のみ発言できます。':'脱落者はチャットを閲覧できますが、送信はできません。';
+}
+$('online-chat-form')?.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const input=$('online-chat-input'),button=$('online-chat-send');
+ const message=input.value.trim();
+ if(!message||message.length>300||!uid||!living(uid)||phase()!=='discussion')return;
+ button.disabled=true;
+ try{
+   await push(roomRef(roundField('chat')),{uid,text:message,at:Date.now()});
+   input.value='';
+ }catch(error){notification('チャット送信：'+error.message);}
+ finally{button.disabled=!(living(uid)&&phase()==='discussion');}
+});
 function renderDiscussion(){setView('online-discussion-screen');renderList($('online-discussion-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
  $('online-discussion-controls').hidden=!host();$('online-start-vote').hidden=!host();$('online-skip-vote').hidden=!host();const ctrl=thisRound().discussionTimerControls||{};$('online-pause-discussion').textContent=ctrl.paused?'再開':'一時停止';
- renderDiscussionChat();
- renderTimer();if(!timer)timer=setInterval(renderTimer,500);
+ renderDiscussionChat();renderTimer();if(!timer)timer=setInterval(renderTimer,500);
 }
-
-// 昼の議論：リアルタイムチャット。夜・投票中は書き込めない。
-function renderDiscussionChat(){
- const log=$('online-chat-messages');
- const messages=Object.entries(thisRound().chat||{})
-   .filter(([,m])=>m&&typeof m.text==='string'&&members()[m.uid])
-   .sort((a,b)=>(a[1].sentAt||0)-(b[1].sentAt||0)||a[0].localeCompare(b[0]));
- const signature=messages.map(([id,m])=>id+':'+m.text).join('|');
- if(log.dataset.signature!==signature){
-   const nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<90;
-   log.replaceChildren();
-   if(!messages.length){const hint=document.createElement('p');hint.className='online-chat-empty';hint.textContent='まだ発言がありません。最初のメッセージを送ってみましょう。';log.append(hint);}
-   for(const [,m] of messages.slice(-150)){
-     const bubble=document.createElement('div');bubble.className='online-chat-bubble'+(m.uid===uid?' is-mine':'');
-     const author=document.createElement('span');author.className='online-chat-author';author.textContent=nameOf(m.uid);
-     const body=document.createElement('p');body.textContent=m.text;
-     bubble.append(author,body);log.append(bubble);
-   }
-   log.dataset.signature=signature;
-   if(nearBottom)log.scrollTop=log.scrollHeight;
- }
- const canSpeak=phase()==='discussion'&&living(uid);
- $('online-chat-input').disabled=!canSpeak;
- $('online-chat-send').disabled=!canSpeak;
- $('online-chat-notice').textContent=canSpeak?'生存しているプレイヤーのみ発言できます。':'脱落者は閲覧のみです。';
-}
-
-$('online-chat-form').addEventListener('submit',async event=>{
- event.preventDefault();
- if(phase()!=='discussion'||!living(uid))return;
- const input=$('online-chat-input'),message=input.value.trim();
- if(!message)return;
- if(message.length>300){notification('メッセージは300文字以内です。');return;}
- const button=$('online-chat-send');button.disabled=true;
- try{
-   const messageRef=push(roomRef(roundField('chat')));
-   await set(messageRef,{uid,text:message,sentAt:Date.now()});
-   input.value='';input.focus();
- }catch(e){notification('チャット送信：'+e.message);}
- finally{button.disabled=phase()!=='discussion'||!living(uid);}
-});
-
 $('online-add-minute').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{};await update(roomRef(roundField('discussionTimerControls')),{extraMs:(c.extraMs||0)+60000});}catch(e){notification('時間追加：'+e.message);}};
 $('online-pause-discussion').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{},now=Date.now();await update(roomRef(roundField('discussionTimerControls')),{paused:!c.paused,pausedAt:!c.paused?now:0,pausedMs:(c.pausedMs||0)+(c.paused?Math.max(0,now-(c.pausedAt||now)):0)});}catch(e){notification('一時停止：'+e.message);}};
 async function startVoting(){if(!host()||phase()!=='discussion')return;await update(roomRef(''),{[roundField('voteState')]:{index:1,candidates:Object.fromEntries(alive().map(id=>[id,true]))},'meta/phase':'voting'});}
@@ -316,43 +442,15 @@ $('online-skip-vote').onclick=async()=>{
     button.disabled = false;
   }
 };
-function renderVoting(){
- setView('online-vote-screen');
- const state=thisRound();
- const v=state.voteState||{};
- const index=Number(v.index||1);
- const candidateMap=v.candidates||{};
- // Firebaseに保存された候補者のみを表示する。
- const candidates=Object.keys(candidateMap).filter(id=>candidateMap[id]===true);
- const targets=candidates.filter(id=>id!==uid&&living(id));
- const vote=state.votes?.[index]?.[uid];
- const done=state.voteReady?.[index]||{};
- const select=$('online-vote-target');
+function renderVoting(){setView('online-vote-screen');const v=thisRound().voteState||{},index=v.index||1,candidates=Object.keys(v.candidates||{}).filter(id=>v.candidates[id]);const vote=thisRound().votes?.[index]?.[uid];const done=thisRound().voteReady?.[index]||{};
  $('online-vote-title').textContent=index===1?'昼の投票':`再投票（${index}回目）`;
- // 同期更新のたびに<select>を再生成すると、特にスマホでは
- // 開いている選択メニューが閉じてしまう。そのため候補が変化した時だけ再生成。
- const previous=select.value;
- const existing=Array.from(select.options).slice(1).map(option=>option.value);
- const changed=existing.length!==targets.length||existing.some((id,i)=>id!==targets[i]);
- if(changed){
-   select.replaceChildren(new Option('投票する相手を選択',''));
-   for(const id of targets)select.add(new Option(nameOf(id),id));
-   if(targets.includes(previous))select.value=previous;
- }
- const isAlive=living(uid);
- const alreadyVoted=!!vote;
- select.disabled=!isAlive||alreadyVoted||targets.length===0;
- $('online-submit-vote').disabled=!isAlive||alreadyVoted||targets.length===0;
- $('online-vote-message').textContent=!isAlive
-   ?'あなたは脱落しているため投票できません。'
-   :alreadyVoted?'投票済みです。'
-   :targets.length===0?'投票できる候補者がいません。ホストに状態の確認を依頼してください。'
-   :index>1?'最多得票の候補者から選択してください。'
-   :'投票する相手を選択してください。';
- const status=countCompleted(done,alive());
- $('online-vote-count').textContent=`投票完了：${status.completed} / ${status.total}人`;
- $('online-finish-vote').hidden=!host();
- $('online-finish-vote').disabled=!status.allDone;
+ opt($('online-vote-target'),candidates.filter(id=>id!==uid&&living(id)),'投票する相手を選択');
+ $('online-submit-vote').disabled=!living(uid)||!!vote;
+ $('online-vote-target').disabled=!living(uid)||!!vote;
+ renderPlayerCards('online-vote-target','mv-vote-candidates');
+ $('online-vote-message').textContent=!living(uid)?'脱落者は投票できません。':vote?'投票済みです。':index>1?'最多得票の候補者だけに再投票します。':'投票先を選択してください。';
+ const status=countCompleted(done,alive());$('online-vote-count').textContent=`投票完了：${status.completed} / ${status.total}人`;
+ $('online-finish-vote').hidden=!host();$('online-finish-vote').disabled=!status.allDone;
 }
 $('online-submit-vote').onclick=async()=>{if(!living(uid)||phase()!=='voting')return;const v=thisRound().voteState,index=v?.index||1,target=$('online-vote-target').value;if(!target||target===uid||!v.candidates?.[target])return notification('投票先を選択してください。');
  try{await set(roomRef(roundField(`votes/${index}/${uid}`)),target);await set(roomRef(roundField(`voteReady/${index}/${uid}`)),true);}catch(e){notification('投票保存：'+e.message);}};

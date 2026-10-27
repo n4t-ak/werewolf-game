@@ -82,6 +82,62 @@ const screenObserver = new MutationObserver(changes => {
 });
 screenObserver.observe(game, { childList: true });
 
+
+// Stage 9: safe offline recovery. Snapshots contain hidden roles, and are removed on completion.
+const MV_SAVE_KEY = 'moonlit-village-offline-save-v1';
+let mvRestoring = false;
+function mvSaveSafe(point) {
+  if (mvRestoring || !players.length || !roles.length) return;
+  const permitted = ['firstPass','nightPass','discussion','votePass','voteStart'];
+  if (!permitted.includes(point) || privateActor !== null) return;
+  try {
+    localStorage.setItem(MV_SAVE_KEY, JSON.stringify({
+      version:1, savedAt:Date.now(), point,
+      state: {players,roles,alive,currentPlayer,nightCount,dayCount,nightActions,
+        nightOrder,nightIndex,previousExecution,seerHistory,voteOrder,voteIndex,
+        voteCandidates,votes,voteRound,mvMatchLog,mvInitialRoles}
+    }));
+  } catch(e) { console.warn('途中復帰の保存に失敗しました',e); }
+}
+function mvClearSave() { try { localStorage.removeItem(MV_SAVE_KEY); } catch(e) {} }
+function mvOfferRecovery() {
+  let saved;
+  try { saved=JSON.parse(localStorage.getItem(MV_SAVE_KEY)||'null'); } catch(e) { mvClearSave(); }
+  if (!saved || saved.version!==1 || !saved.state ||
+      !Array.isArray(saved.state.players) || !Array.isArray(saved.state.roles)) return;
+  // Do not keep a roster of secret roles on a shared device indefinitely.
+  if (Date.now()-saved.savedAt>24*60*60*1000) { mvClearSave(); return; }
+  const wrapper=document.createElement('div');wrapper.className='mv-recovery';
+  const title=document.createElement('h2');title.textContent='前回のゲームが見つかりました';
+  const notice=document.createElement('p');notice.textContent='途中から再開すると、次の人への受け渡し画面から始まります。役職はここでは表示されません。';
+  const resume=document.createElement('button');resume.type='button';resume.textContent='途中から再開';
+  const fresh=document.createElement('button');fresh.type='button';fresh.textContent='新しく始める（前回の記録を削除）';
+  resume.onclick=()=>{
+    const st=saved.state;
+    try {
+      if(st.players.length!==st.roles.length || st.alive.length!==st.players.length) throw Error('保存データが不正です');
+      ({players,roles,alive,currentPlayer,nightCount,dayCount,nightActions,nightOrder,
+        nightIndex,previousExecution,seerHistory,voteOrder,voteIndex,
+        voteCandidates,votes,voteRound,mvMatchLog,mvInitialRoles}=st);
+      privateActor=null; mvRestoring=true;
+      document.querySelector('.mv-mode-nav')?.setAttribute('hidden','');
+      // Recovery only invokes transitions known not to mutate votes or resolve a night twice.
+      switch(saved.point) {
+        case 'firstPass': showPassScreen(); break;
+        case 'nightPass': showNightPassScreen(); break;
+        case 'votePass': showVotePassScreen(); break;
+        case 'voteStart': beginVoteRound(); break;
+        case 'discussion': startDay(); break;
+        default: throw Error('不明な保存画面');
+      }
+    } catch(e) { console.error(e); mvClearSave(); location.reload(); }
+    finally { mvRestoring=false; }
+  };
+  fresh.onclick=()=>{mvClearSave();location.reload();};
+  wrapper.append(title,notice,resume,fresh);game.replaceChildren(wrapper);
+}
+window.addEventListener('DOMContentLoaded', mvOfferRecovery, {once:true});
+
 // ------------------------------------
 // 共通の画面表示
 // ------------------------------------
@@ -97,7 +153,13 @@ function showScreen(title, message, buttonText, callback) {
 
   const button = document.createElement("button");
   button.textContent = buttonText;
-  button.onclick = callback;
+  let clicked = false;
+  button.onclick = () => {
+    if (clicked) return;
+    clicked = true;
+    button.disabled = true;
+    try { callback(); } catch (error) { clicked=false; button.disabled=false; throw error; }
+  };
 
   game.append(h2, p, button);
   showPrivateRoleBadge();
@@ -123,6 +185,16 @@ function showRandomWait(title, message) {
   button.onclick = nextNightPlayer;
 
   game.append(h2, p, status, button);
+  if (title === "人狼：仲間の確認" && p.textContent.startsWith("仲間の人狼：")) {
+    const names = p.textContent.slice("仲間の人狼：".length);
+    p.className = 'wolf-teammates';
+    p.replaceChildren();
+    const label = document.createElement('span');
+    label.textContent = '仲間の人狼';
+    const strong = document.createElement('strong');
+    strong.textContent = names;
+    p.append(label, strong);
+  }
   showPrivateRoleBadge();
 
   setTimeout(() => {
@@ -152,7 +224,13 @@ function showChoices(title, message, targets, callback) {
     button.style.setProperty("--player-color", ["#f2c57f","#80caff","#fb8792","#8ee5ab","#c8a5fc","#ffbb87","#80e2d8","#f2a6cf"][index % 8]);
     button.querySelector(".mv-person-name").textContent = players[index];
 
-    button.onclick = () => callback(index);
+    let clicked = false;
+    button.onclick = () => {
+      if (clicked) return;
+      clicked = true;
+      button.disabled = true;
+      try { callback(index); } catch (error) { clicked=false; button.disabled=false; throw error; }
+    };
 
     list.appendChild(button);
   });
@@ -364,6 +442,13 @@ function assignRoles() {
   previousExecution = null;
     seerHistory = {};
 
+  // 配役直後に初夜の記録と行動順を初期化する。役職確認と初夜は同じ画面で行う。
+  mvInitialRoles = [...roles];
+  mvMatchLog = [];
+  nightActions = { attack: null, guards: [], inspections: [], wolfProposals: [] };
+  nightOrder = players.map((_, i) => i).filter(i => alive[i]);
+  nightIndex = 0;
+  privateActor = null;
   showPassScreen();
 }
 
@@ -372,53 +457,25 @@ function assignRoles() {
 // ------------------------------------
 
 function showPassScreen() {
+  // 役職を次の人に見せない。最初の夜の行動を終えたらそのまま朝へ。
+  privateActor = null;
   if (currentPlayer >= players.length) {
-    showScreen(
-      "準備完了",
-      "全員の役職確認が終わりました",
-      "最初の夜へ",
-      startNight
-    );
+    resolveNight();
     return;
   }
-
+  mvSaveSafe('firstPass');
   showScreen(
     players[currentPlayer],
-    "端末を受け取ってください",
-    "役職を確認",
+    `${players[currentPlayer]}さんに端末を渡してください。`,
+    "役職確認・最初の夜の行動",
     showRole
   );
 }
 
 function showRole() {
-  const role = roles[currentPlayer];
-  const descriptions = {
-    "人狼": "夜にプレイヤーを襲撃します。",
-    "占い師": "夜に1人を占えます。",
-    "騎士": "夜に1人を護衛できます。",
-    "霊媒師": "処刑された人が人狼だったか確認できます。",
-    "村人": "議論と投票で人狼を探しましょう。",
-    "狂人": "人狼側の勝利を目指します。",
-    "怪盗": "初夜に役職を交換できます。",
-    "てるてる": "昼の処刑を目指す第三陣営です。"
-  };
-  showScreen(
-    `${players[currentPlayer]}の役職`,
-    descriptions[role] || 'あなたの役職を確認してください。',
-    "確認完了・画面を隠す",
-    () => {
-      currentPlayer++;
-      showPassScreen();
-    }
-  );
-  const heading=game.querySelector('h2');
-  if(heading)heading.classList.add('mv-offline-role-heading');
-  if(window.MVRoleCard){
-    const stage=document.createElement('div');
-    stage.className='mv-offline-role-stage';
-    game.insertBefore(stage,game.querySelector('p'));
-    window.MVRoleCard.mount(stage,role);
-  }
+  // 1回目の個人画面に役職カードと夜の行動をまとめる。
+  nightIndex = currentPlayer;
+  showNightAction(currentPlayer);
 }
 
 // ------------------------------------
@@ -467,6 +524,7 @@ function showNightPassScreen() {
   }
 
   const index = nightOrder[nightIndex];
+  mvSaveSafe('nightPass');
 
   showScreen(
     "夜のフェーズ",
@@ -626,13 +684,15 @@ if (isSoloWolf) {
   if (!isSoloWolf) {
     const teammates = document.createElement("p");
 
-    teammates.textContent =
-      "仲間の人狼：" +
-      wolves
-        .filter(i => i !== index)
-        .map(i => players[i])
-        .join("、");
-
+    teammates.className = 'wolf-teammates';
+    const allyLabel = document.createElement('span');
+    allyLabel.textContent = '仲間の人狼';
+    const allyNames = document.createElement('strong');
+    allyNames.textContent = wolves
+      .filter(i => i !== index)
+      .map(i => players[i])
+      .join('、');
+    teammates.append(allyLabel, allyNames);
     game.appendChild(teammates);
   }
 
@@ -906,7 +966,13 @@ function handleMedium() {
 
 function nextNightPlayer() {
   nightIndex++;
-  showNightPassScreen();
+  privateActor = null;
+  if (nightCount === 0) {
+    currentPlayer = nightIndex;
+    showPassScreen();
+  } else {
+    showNightPassScreen();
+  }
 }
 
 // ------------------------------------
@@ -1002,6 +1068,8 @@ function showMorning(victim) {
 // ------------------------------------
 
 function startDay() {
+  privateActor = null;
+  mvSaveSafe('discussion');
   showScreen(
     `${dayCount}日目の昼`,
     "生存者全員で話し合い、人狼だと思う人を探してください。",
@@ -1030,6 +1098,8 @@ function startVoting() {
 function beginVoteRound() {
   voteIndex = 0;
   votes = [];
+  privateActor = null;
+  mvSaveSafe('voteStart');
 
   const title = voteRound === 1
     ? "投票開始"
@@ -1059,6 +1129,7 @@ function showVotePassScreen() {
   }
 
   const voter = voteOrder[voteIndex];
+  mvSaveSafe('votePass');
 
   showScreen(
     "投票",
@@ -1255,6 +1326,7 @@ function checkWinner() {
 
 function showWinner(winner) {
   privateActor = null;
+  mvClearSave();
   game.replaceChildren();
   const root=document.createElement('div');
   root.className='mv-finale';

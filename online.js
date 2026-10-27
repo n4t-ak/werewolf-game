@@ -4,6 +4,12 @@ import { db, loginAnonymously } from './firebase-config.js';
 import {validatePlayerCount,getRoundPath,getAliveUids,needsNightAction,checkGameWinner,countCompleted,calculateVotes,applyThiefSwap,getSeerResult,getMediumResult,resolveExecution,resolveNight} from './online-engine.js';
 
 const $ = id => document.getElementById(id);
+const MV_ROOM_KEY='moonlit-village-online-room-v1';
+function mvStoreRoom(roomCode,displayName){
+  try{localStorage.setItem(MV_ROOM_KEY,JSON.stringify({roomCode,displayName,savedAt:Date.now()}));}catch(e){}
+}
+function mvForgetRoom(){try{localStorage.removeItem(MV_ROOM_KEY);}catch(e){}}
+
 const screens = ['entry-screen','lobby-screen','online-role-reveal','online-night-screen','online-day-screen','online-discussion-screen','online-vote-screen','online-vote-result-screen','online-game-over-screen'];
 const roleNames = ['人狼','狂人','占い師','騎士','霊媒師','てるてる','怪盗'];
 const extras = [
@@ -148,6 +154,7 @@ async function enterRoom(roomCode, nickname, create=false) {
   const memberRef=roomRef(`members/${uid}`);
   const existing=await get(memberRef);
   if(!existing.exists())await set(memberRef,{name:nickname,joinedAt:Date.now()});
+  mvStoreRoom(room,nickname);
   history.replaceState(null,'',`${location.pathname}?room=${room}`);
   if(offRoom)offRoom();
   offRoom=onValue(roomRef(''),snap=>{if(!snap.exists()){notification('ルームが存在しません。');return;}data=snap.val();render();},err=>notification('同期エラー：'+err.message));
@@ -214,7 +221,8 @@ $('online-leave-room').onclick = async () => {
     data = null;
     savedSettings = '';
     if (timer) { clearInterval(timer); timer = null; }
-    history.replaceState(null, '', location.pathname);
+    mvForgetRoom();
+     history.replaceState(null, '', location.pathname);
     switchEntry('menu');
     setView('entry-screen');
     updateRoomNavigation();
@@ -452,8 +460,8 @@ function renderVoting(){setView('online-vote-screen');const v=thisRound().voteSt
  const status=countCompleted(done,alive());$('online-vote-count').textContent=`投票完了：${status.completed} / ${status.total}人`;
  $('online-finish-vote').hidden=!host();$('online-finish-vote').disabled=!status.allDone;
 }
-$('online-submit-vote').onclick=async()=>{if(!living(uid)||phase()!=='voting')return;const v=thisRound().voteState,index=v?.index||1,target=$('online-vote-target').value;if(!target||target===uid||!v.candidates?.[target])return notification('投票先を選択してください。');
- try{await set(roomRef(roundField(`votes/${index}/${uid}`)),target);await set(roomRef(roundField(`voteReady/${index}/${uid}`)),true);}catch(e){notification('投票保存：'+e.message);}};
+$('online-submit-vote').onclick=async()=>{if(busy||!living(uid)||phase()!=='voting')return;busy=true;$('online-submit-vote').disabled=true;const v=thisRound().voteState,index=v?.index||1,target=$('online-vote-target').value;if(!target||target===uid||!v.candidates?.[target])return notification('投票先を選択してください。');
+ try{await update(roomRef(''),{[roundField(`votes/${index}/${uid}`)]:target,[roundField(`voteReady/${index}/${uid}`)]:true});}catch(e){notification('投票保存：'+e.message);$('online-submit-vote').disabled=false;}finally{busy=false;}};
 async function finishResult(result){
  const patch={[roundField('voteResult')]:result};let winner=null;
  if(result.targetUid){const execution=resolveExecution(data.roles,result.targetUid,data.eliminated||{});patch[`eliminated/${result.targetUid}`]=true;winner=execution.winner;}
@@ -701,3 +709,24 @@ function openVoteSkipConfirm() {
     document.addEventListener('keydown', onKeydown);
   });
 }
+
+// Stage 9: an explicit reconnect button. No saved roles are stored in the browser;
+// Firebase remains the authority, and an anonymous account must still own its membership.
+(function mvOfferRoomRecovery(){
+  let stored;try{stored=JSON.parse(localStorage.getItem(MV_ROOM_KEY)||'null');}catch(e){mvForgetRoom();}
+  if(!stored || !/^\d{6}$/.test(stored.roomCode||'') ||
+      typeof stored.displayName!=='string' || Date.now()-stored.savedAt>7*86400000) return;
+  const menu=$('online-menu-screen');if(!menu)return;
+  const button=document.createElement('button');button.type='button';
+  button.className='online-secondary-button';button.textContent='前回のルームに再接続（'+stored.roomCode+'）';
+  button.onclick=async()=>{
+    if(busy)return;
+    try{
+      const account=await loginAnonymously();
+      const old=await get(ref(db,`rooms/${stored.roomCode}/members/${account.uid}`));
+      if(!old.exists()) {notification('前回と同じ参加者として認証できません。ルーム参加画面から確認してください。');return;}
+      await enterRoom(stored.roomCode,old.val().name||stored.displayName,false);
+    }catch(e){notification('再接続できません：'+e.message);}
+  };
+  menu.append(button);
+})();

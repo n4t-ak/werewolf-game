@@ -1,0 +1,11 @@
+/* Stage 9: new optional recovery and role guide controls, isolated from existing screens. */
+body.mv-theme .mv-recovery{display:grid;gap:12px}
+body.mv-theme .mv-guide-button{display:block;margin:12px auto 0;padding:8px 18px;border:1px solid #967749;border-radius:9px;background:#171d2b;color:#f0d9ab;font-weight:700;cursor:pointer}
+body.mv-theme .mv-guide-button[hidden]{display:none!important}
+.mv-guide-dialog{width:min(92vw,660px);max-height:86dvh;overflow:auto;border:1px solid #b29661;border-radius:18px;background:#121b2a;color:#f6e5ca;padding:22px;box-shadow:0 20px 70px #000b}
+.mv-guide-dialog::backdrop{background:#02050bd9}
+.mv-guide-dialog h2,.mv-guide-dialog h3{color:#f1d8a7}
+.mv-guide-dialog>button{float:right;padding:8px 16px;border:1px solid #9b804f;background:#393023;color:#f5e7ca;border-radius:8px;cursor:pointer}
+.mv-guide-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;clear:both}
+.mv-guide-entry{padding:12px;border:1px solid #66583f;border-radius:10px;background:#1a2536}
+.mv-guide-entry h3{margin:0 0 5px}.mv-guide-entry small{color:#bcab8a}.mv-guide-entry p{line-height:1.7;font-size:13px}

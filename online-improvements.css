@@ -1,0 +1,13 @@
+/* Online-only enhancements. Never affect the offline version. */
+body.mv-theme #online-chat-messages{height:clamp(360px,55dvh,680px)!important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:auto;touch-action:pan-y;padding:16px!important}
+body.mv-theme #online-chat-form,body.mv-theme #online-wolf-chat-form{align-items:flex-end}
+body.mv-theme #online-chat-input,body.mv-theme #online-wolf-chat-input{box-sizing:border-box;display:block;flex:1;width:100%;min-width:0;min-height:100px;max-height:240px;padding:14px!important;resize:vertical;font:16px/1.6 system-ui,sans-serif;background:#141a26!important;color:#fff3df!important;border:1px solid #a98c5e!important;border-radius:11px;overflow:auto}
+body.mv-theme #online-chat-input:focus-visible,body.mv-theme #online-wolf-chat-input:focus-visible{outline:3px solid #e3c17d;outline-offset:2px}
+body.mv-theme .online-wolf-chat{margin-top:20px!important;border-color:#a84d60!important;background:linear-gradient(155deg,#33202a,#141924)!important}
+body.mv-theme #online-wolf-chat-messages{height:clamp(280px,42dvh,500px);min-height:280px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;padding:14px}
+body.mv-theme .online-wolf-chat .online-chat-header strong{color:#ffb5b9}
+body.mv-theme .online-private-result{padding:15px 17px;border:1px solid #bd9c63;background:#262338;border-radius:12px;color:#ffdfa0!important;font-size:17px;font-weight:800;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+body.mv-theme .online-private-result[hidden]{display:none!important}
+body.mv-theme #online-night-tarot{display:grid;justify-items:center}
+body.mv-theme #online-night-role[hidden],body.mv-theme #online-wolf-chat-panel[hidden]{display:none!important}
+@media(max-width:480px){body.mv-theme #online-chat-messages{height:52dvh!important;min-height:350px}body.mv-theme #online-chat-input,body.mv-theme #online-wolf-chat-input{min-height:108px}body.mv-theme #online-wolf-chat-messages{height:40dvh;min-height:260px}}

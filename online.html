@@ -165,15 +165,16 @@
 #online-night-result:not(:empty){display:block;white-space:pre-line;background:#223450;border:1px solid #59739b;border-radius:12px;padding:14px;color:#fff;line-height:1.8}
 @media(max-width:400px){.online-chat-panel{padding:10px}.online-chat-messages{height:260px}#online-chat-send{padding:10px 12px}}
 </style>
-  <script src="./audio.js?v=stage5" defer></script>
+  <script src="./online-audio.js?v=stage10" defer></script>
   <link rel="stylesheet" href="./stage9-additions.css?v=stage9">
+  <link rel="stylesheet" href="./online-improvements.css?v=20261027a">
 </head>
 <body class="mv-theme" data-scene="lobby">
 
 
 
 <script src="./role-card.js?v=cards-20261027" defer></script>
-<script type="module" src="./online.js?v=stage9"></script>
+<script type="module" src="./online.js?v=20261027a"></script>
 
 
 
@@ -401,7 +402,8 @@
         <!-- 全員共通：初夜の行動画面 -->
         <div id="online-night-screen" hidden>
           <h2 id="online-night-title">初夜</h2>
-          <p id="online-night-role"></p>
+          <div id="online-night-tarot" class="online-night-tarot" aria-label="あなたの役職カード"></div>
+          <p id="online-night-role" hidden></p>
           <p id="online-night-message"></p>
 
           <div id="online-night-action-area" hidden>
@@ -419,6 +421,15 @@
 
           <button id="online-night-skip" type="button" hidden>交換しない／行動なしで完了</button>
           <p id="online-night-result" role="status"></p>
+          <section id="online-wolf-chat-panel" class="online-chat-panel online-wolf-chat" aria-label="人狼専用の夜チャット" hidden>
+            <div class="online-chat-header"><strong>人狼の相談</strong><span>夜・人狼のみ</span></div>
+            <div id="online-wolf-chat-messages" class="online-chat-messages" role="log" aria-live="polite"></div>
+            <form id="online-wolf-chat-form" class="online-chat-form">
+              <textarea id="online-wolf-chat-input" rows="3" maxlength="300" placeholder="仲間の人狼へメッセージ（300文字以内）" aria-label="人狼専用メッセージ"></textarea>
+              <button type="submit" id="online-wolf-chat-send">送信</button>
+            </form>
+            <p id="online-wolf-chat-notice" class="online-chat-notice">人狼陣営の狂人には表示されません。</p>
+          </section>
           
 <button id="online-night-done" type="button" hidden>
   夜の行動を完了する
@@ -463,6 +474,7 @@
   <button id="online-pause-discussion" type="button">一時停止</button>
 </div>
 
+  <p id="online-discussion-private-result" class="online-private-result" role="status" hidden></p>
   <p id="online-discussion-message">
     議論中です。
   </p>
@@ -470,7 +482,7 @@
     <div class="online-chat-header"><strong>議論チャット</strong><span>リアルタイム</span></div>
     <div id="online-chat-messages" class="online-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
     <form id="online-chat-form" class="online-chat-form">
-      <input id="online-chat-input" type="text" maxlength="300" autocomplete="off" placeholder="発言を入力（300文字以内）" aria-label="チャットのメッセージ">
+      <textarea id="online-chat-input" rows="3" maxlength="300" placeholder="発言を入力（300文字以内）" aria-label="チャットのメッセージ"></textarea>
       <button id="online-chat-send" type="submit">送信</button>
     </form>
     <p id="online-chat-notice" class="online-chat-notice"></p>

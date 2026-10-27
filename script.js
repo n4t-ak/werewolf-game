@@ -29,12 +29,34 @@ let voteRound = 1;
 // 第4段階：試合全体の振り返り
 let mvMatchLog = [];
 let mvInitialRoles = [];
+// 怪盗：初夜に予約した交換と、翌夜に表示する本人宛通知
+let mvThiefChoices = [];
+let mvThiefNotices = {};
+let mvMadmanKnowsWolves = false;
+// 以前の詳細設定（オフライン）
+let mvDetailSettings = {
+  allowConsecutiveGuard: false,
+  roleMissing: false,
+  publicVotes: false,
+  randomEvents: false
+};
+let mvPreviousGuards = {};
+let mvDiscussionState = { duration: 180, remaining: 180, running: false, eventText: '' };
+let mvDiscussionTimerId = null;
+function mvStopDiscussionTimer() {
+  if (mvDiscussionTimerId !== null) clearInterval(mvDiscussionTimerId);
+  mvDiscussionTimerId = null;
+}
+
 
 const roleTypes = [
   { id: "werewolf", name: "人狼" },
   { id: "seer", name: "占い師" },
   { id: "knight", name: "騎士" },
-  { id: "medium", name: "霊媒師" }
+  { id: "medium", name: "霊媒師" },
+  { id: "madman", name: "狂人" },
+  { id: "teruteru", name: "てるてる" },
+  { id: "thief", name: "怪盗" }
 ];
 
 // 夜・昼の個人操作画面に役職を表示する（受け渡し画面には表示しない）
@@ -95,7 +117,9 @@ function mvSaveSafe(point) {
       version:1, savedAt:Date.now(), point,
       state: {players,roles,alive,currentPlayer,nightCount,dayCount,nightActions,
         nightOrder,nightIndex,previousExecution,seerHistory,voteOrder,voteIndex,
-        voteCandidates,votes,voteRound,mvMatchLog,mvInitialRoles}
+        voteCandidates,votes,voteRound,mvMatchLog,mvInitialRoles,
+        mvThiefChoices,mvThiefNotices,mvMadmanKnowsWolves,
+        mvDetailSettings,mvPreviousGuards,mvDiscussionState}
     }));
   } catch(e) { console.warn('途中復帰の保存に失敗しました',e); }
 }
@@ -119,6 +143,13 @@ function mvOfferRecovery() {
       ({players,roles,alive,currentPlayer,nightCount,dayCount,nightActions,nightOrder,
         nightIndex,previousExecution,seerHistory,voteOrder,voteIndex,
         voteCandidates,votes,voteRound,mvMatchLog,mvInitialRoles}=st);
+      mvThiefChoices = Array.isArray(st.mvThiefChoices) ? st.mvThiefChoices : [];
+      mvThiefNotices = st.mvThiefNotices || {};
+      mvMadmanKnowsWolves = st.mvMadmanKnowsWolves === true;
+      mvDetailSettings = {allowConsecutiveGuard:false,roleMissing:false,publicVotes:false,randomEvents:false,...st.mvDetailSettings};
+      mvPreviousGuards = st.mvPreviousGuards || {};
+      mvDiscussionState = st.mvDiscussionState || {duration:180,remaining:180,running:false,eventText:''};
+      mvStopDiscussionTimer();
       privateActor=null; mvRestoring=true;
       document.querySelector('.mv-mode-nav')?.setAttribute('hidden','');
       // Recovery only invokes transitions known not to mutate votes or resolve a night twice.
@@ -321,6 +352,15 @@ function showRoleSettings() {
     <h2>役職設定</h2>
     <p>役職ごとの人数を設定してください</p>
     <div id="role-settings"></div>
+    <fieldset class="mv-extra-settings" style="margin:16px 0;padding:14px;border:1px solid #9d8556;border-radius:12px">
+      <legend style="color:#f4ddb0;font-weight:bold">詳細設定</legend>
+      <label class="field-label" style="display:block;margin:9px 0"><input id="mv-madman-knows" type="checkbox"> 狂人が人狼の名前を確認できる</label>
+      <label class="field-label" style="display:block;margin:9px 0"><input id="mv-consecutive-guard" type="checkbox"> 騎士の連続護衛を許可</label>
+      <label class="field-label" style="display:block;margin:9px 0"><input id="mv-role-missing" type="checkbox"> 役職欠けを有効にする</label>
+      <label class="field-label" style="display:block;margin:9px 0"><input id="mv-public-votes" type="checkbox"> 投票履歴を公開する</label>
+      <label class="field-label" style="display:block;margin:9px 0"><input id="mv-random-events" type="checkbox"> ランダム事件カードを有効にする</label>
+      <p style="font-size:12px;margin-top:8px">議論時間は通常3分。事件カードON時は2分・3分・5分のいずれかになります。</p>
+    </fieldset>
     <p id="villager-count"></p>
     <p id="role-error" class="error-text"></p>
     <button id="assign">役職を決定</button>
@@ -352,6 +392,7 @@ function showRoleSettings() {
   });
 
   document.getElementById("assign").onclick = assignRoles;
+  document.getElementById('mv-role-missing').addEventListener('change',updateRoleCount);
 
   updateRoleCount();
 }
@@ -371,6 +412,10 @@ function validateRoleCounts(counts) {
 
   const total = counts.reduce((sum, n) => sum + n, 0);
   const villagers = players.length - total;
+
+  if (document.getElementById('mv-role-missing')?.checked && counts.slice(1).every(n => n === 0)) {
+    return "役職欠けを使用するには、人狼以外の特殊役職を1人以上設定してください";
+  }
 
   if (counts[0] < 1) {
     return "人狼は最低1人必要です";
@@ -415,6 +460,16 @@ function assignRoles() {
     return;
   }
 
+  mvMadmanKnowsWolves = document.getElementById("mv-madman-knows")?.checked === true;
+  mvDetailSettings = {
+    allowConsecutiveGuard: document.getElementById('mv-consecutive-guard').checked,
+    roleMissing: document.getElementById('mv-role-missing').checked,
+    publicVotes: document.getElementById('mv-public-votes').checked,
+    randomEvents: document.getElementById('mv-random-events').checked
+  };
+  mvPreviousGuards = {};
+  mvDiscussionState = {duration:180,remaining:180,running:false,eventText:''};
+  mvStopDiscussionTimer();
   roles = [];
 
   roleTypes.forEach((role, index) => {
@@ -425,6 +480,11 @@ function assignRoles() {
 
   while (roles.length < players.length) {
     roles.push("村人");
+  }
+  // オンライン版と同様、人狼・村人以外の特殊役職1枠を村人に置換。
+  if (mvDetailSettings.roleMissing) {
+    const options = roles.map((role,i) => role!=='人狼' && role!=='村人' ? i : -1).filter(i => i>=0);
+    if (options.length) roles[options[Math.floor(Math.random()*options.length)]]='村人';
   }
 
   // シャッフル
@@ -445,6 +505,8 @@ function assignRoles() {
   // 配役直後に初夜の記録と行動順を初期化する。役職確認と初夜は同じ画面で行う。
   mvInitialRoles = [...roles];
   mvMatchLog = [];
+  mvThiefChoices = [];
+  mvThiefNotices = {};
   nightActions = { attack: null, guards: [], inspections: [], wolfProposals: [] };
   nightOrder = players.map((_, i) => i).filter(i => alive[i]);
   nightIndex = 0;
@@ -538,11 +600,21 @@ function showNightPassScreen() {
 
 function showNightAction(index) {
   privateActor = index;
+  // 交換された側には翌夜の本人画面でのみ通知する。
+  const notice = nightCount > 0 ? mvThiefNotices[index] : null;
+  if (notice) {
+    delete mvThiefNotices[index];
+    showScreen('怪盗による役職交換', `あなたの役職は「${notice}」になりました。`,
+      '新しい役職を確認して夜の行動へ', () => showNightAction(index));
+    return;
+  }
   const role = roles[index];
 
   // 最初の夜
   if (nightCount === 0) {
-    if (role === "占い師") {
+    if (role === "怪盗") {
+      handleThief(index);
+    } else if (role === "占い師") {
       handleSeer(index);
 
     } else if (role === "人狼") {
@@ -564,11 +636,14 @@ function showNightAction(index) {
         message
       );
 
+    } else if (role === '狂人') {
+      // 狂人は人狼側だが、人狼そのものではない。
+      const wolves = players.map((_,i)=>i).filter(i=>alive[i]&&roles[i]==='人狼');
+      showRandomWait('狂人：仲間の確認', mvMadmanKnowsWolves
+        ? (wolves.length ? `人狼：${wolves.map(i=>players[i]).join('、')}` : '人狼は確認できません。')
+        : 'あなたは人狼陣営です。今夜は行動がありません。');
     } else {
-      showRandomWait(
-        "最初の夜",
-        "今夜は行動がありません。"
-      );
+      showRandomWait('最初の夜', '今夜は行動がありません。');
     }
 
     return;
@@ -596,6 +671,40 @@ function showNightAction(index) {
 }
 
 
+
+// 怪盗は初夜に一度だけ交換相手を選ぶ。交換は初夜全員の行動後に確定。
+// 操作順で怪盗が特定されないよう、選択後は通常の個人操作と同じ受け渡しへ。
+function handleThief(index) {
+  if (mvThiefChoices.some(choice=>choice.thief===index)) {
+    showRandomWait('最初の夜','今夜の行動は完了しています。');
+    return;
+  }
+  const reserved = new Set(mvThiefChoices.flatMap(c=>[c.thief,c.target]));
+  const targets = getTargets(index).filter(i=>!reserved.has(i));
+  if (!targets.length) {
+    showRandomWait('怪盗','交換できる相手がいません。');
+    return;
+  }
+  showChoices('怪盗：役職交換','役職を交換する相手を1人選んでください。',targets,target=>{
+    mvThiefChoices.push({thief:index,target});
+    showScreen('交換先を決定','交換は最初の夜が終わると確定します。',
+      '画面を隠して次へ',nextNightPlayer);
+  });
+}
+
+function mvApplyFirstNightThiefSwaps() {
+  const used = new Set();
+  for (const {thief,target} of mvThiefChoices) {
+    if (used.has(thief)||used.has(target)||roles[thief]!=='怪盗'||thief===target) continue;
+    const taken=roles[target];
+    roles[thief]=taken;
+    roles[target]='怪盗';
+    mvThiefNotices[thief]=taken;
+    mvThiefNotices[target]='怪盗';
+    used.add(thief);used.add(target);
+  }
+  mvThiefChoices=[];
+}
 
 function getTargets(index, excludeSelf = true) {
   return players
@@ -918,7 +1027,14 @@ function handleSeer(index) {
 // ------------------------------------
 
 function handleKnight(index) {
-  const targets = getTargets(index, false);
+  let targets = getTargets(index, false);
+  if (!mvDetailSettings.allowConsecutiveGuard && mvPreviousGuards[index] !== undefined) {
+    targets = targets.filter(target => target !== mvPreviousGuards[index]);
+  }
+  if (!targets.length) {
+    showScreen('騎士：護衛', '護衛できる相手がいません。', '画面を隠して次へ', nextNightPlayer);
+    return;
+  }
 
   showChoices(
     "騎士：護衛",
@@ -926,6 +1042,7 @@ function handleKnight(index) {
     targets,
     target => {
       nightActions.guards.push(target);
+      mvPreviousGuards[index] = target;
 
       showScreen(
         "護衛先を決定",
@@ -980,6 +1097,7 @@ function nextNightPlayer() {
 // ------------------------------------
 
 function resolveNight() {
+  if (nightCount === 0) mvApplyFirstNightThiefSwaps();
   let victim = null;
 
   // 最初の夜は犠牲者なし
@@ -1069,6 +1187,18 @@ function showMorning(victim) {
 
 function startDay() {
   privateActor = null;
+  mvStopDiscussionTimer();
+  // 復元直後は保存されたイベントと残り時間を引き継ぐ。
+  if (!mvRestoring) {
+    let seconds=180, eventText='平穏な朝：議論は3分';
+    if (mvDetailSettings.randomEvents) {
+      const roll=Math.random();
+      seconds = roll < 0.2 ? 120 : roll < 0.4 ? 300 : 180;
+      eventText= seconds===120?'緊急会議：議論は2分':seconds===300?'延長会議：議論は5分':'平穏な朝：議論は3分';
+    }
+    mvDiscussionState={duration:seconds,remaining:seconds,running:false,eventText};
+    mvMatchLog.push({type:'event',day:dayCount,note:eventText});
+  }
   mvSaveSafe('discussion');
   showScreen(
     `${dayCount}日目の昼`,
@@ -1076,6 +1206,35 @@ function startDay() {
     "議論終了・投票開始",
     startVoting
   );
+  const section=document.createElement('section');
+  section.className='mv-discussion-controls';
+  section.style.cssText='border:1px solid #96794c;border-radius:12px;padding:14px;margin:14px 0;text-align:center;background:#141b29';
+  const event=document.createElement('p');event.textContent=mvDiscussionState.eventText;
+  const clock=document.createElement('div');clock.style.cssText='font-size:40px;font-weight:800;color:#f0d293;font-variant-numeric:tabular-nums';
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;justify-content:center';
+  const toggle=document.createElement('button');toggle.type='button';toggle.textContent='開始';
+  const extend=document.createElement('button');extend.type='button';extend.textContent='＋1分';
+  const render=()=>{
+    const sec=Math.max(0,Math.ceil(mvDiscussionState.remaining));
+    clock.textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+    toggle.textContent= mvDiscussionState.running?'一時停止':sec?'開始・再開':'時間終了';
+    toggle.disabled=sec===0;
+  };
+  let last=Date.now();
+  const tick=()=>{
+    const now=Date.now();
+    if(mvDiscussionState.running) {
+      mvDiscussionState.remaining=Math.max(0,mvDiscussionState.remaining-(now-last)/1000);
+      if(mvDiscussionState.remaining===0)mvDiscussionState.running=false;
+      render();
+    }
+    last=now;
+  };
+  toggle.onclick=()=>{tick();mvDiscussionState.running=!mvDiscussionState.running;last=Date.now();render();mvSaveSafe('discussion');};
+  extend.onclick=()=>{tick();mvDiscussionState.remaining+=60;mvDiscussionState.duration+=60;render();mvSaveSafe('discussion');};
+  actions.append(toggle,extend);section.append(event,clock,actions);
+  game.insertBefore(section,game.lastElementChild);
+  render();mvDiscussionTimerId=setInterval(tick,250);
 }
 
 // ------------------------------------
@@ -1083,6 +1242,7 @@ function startDay() {
 // ------------------------------------
 
 function startVoting() {
+  mvStopDiscussionTimer();
   voteOrder = players
     .map((_, index) => index)
     .filter(index => alive[index]);
@@ -1270,7 +1430,8 @@ function showVoteResults(results, executed) {
   button.textContent = "次へ";
 
   button.onclick = () => {
-    const winner = checkWinner();
+    // てるてるは昼の投票による処刑時のみ単独勝利。
+    const winner = roles[executed] === 'てるてる' ? 'てるてる' : checkWinner();
 
     if (winner !== null) {
       showWinner(winner);
@@ -1325,6 +1486,7 @@ function checkWinner() {
 // ------------------------------------
 
 function showWinner(winner) {
+  mvStopDiscussionTimer();
   privateActor = null;
   mvClearSave();
   game.replaceChildren();
@@ -1332,7 +1494,7 @@ function showWinner(winner) {
   root.className='mv-finale';
   root.dataset.winner=winner==='人狼陣営'?'wolf':winner==='てるてる'?'third':'village';
   const hero=document.createElement('header');hero.className='mv-finale-hero';
-  const sigil=document.createElement('div');sigil.className='mv-finale-sigil';sigil.textContent=winner==='人狼陣営'?'☾':'✦';
+  const sigil=document.createElement('div');sigil.className='mv-finale-sigil';sigil.textContent=winner==='人狼陣営'?'☾':winner==='てるてる'?'✷':'✦';
   const eyebrow=document.createElement('p');eyebrow.textContent='GAME RESULT · THE LAST REVELATION';
   const heading=document.createElement('h2');heading.textContent=`${winner}の勝利`;
   const subtitle=document.createElement('p');subtitle.textContent=`${players.length}人の物語 · ${dayCount}日間の記録`;
@@ -1361,13 +1523,16 @@ function showWinner(winner) {
     const summary=document.createElement('summary');summary.textContent=`${day}日目の出来事`;details.append(summary);
     mvMatchLog.filter(x=>x.day===day).forEach(item=>{
       const line=document.createElement('div');line.className='mv-finale-logline';
-      const title=document.createElement('strong');title.textContent=item.type==='night'?'夜明け':'投票・処刑';
+      const title=document.createElement('strong');title.textContent=item.type==='night'?'夜明け':item.type==='event'?'事件カード':'投票・処刑';
       const desc=document.createElement('span');desc.textContent=item.note;line.append(title,desc);details.append(line);
       if(item.type==='vote'){
         const score=document.createElement('p');score.className='mv-finale-votes';
         score.textContent=Object.entries(item.counts).map(([id,count])=>`${players[id]}：${count}票`).join(' ／ ');details.append(score);
         const choices=document.createElement('p');choices.className='mv-finale-votes';
-        choices.textContent=item.votes.map(v=>`${players[v.voter]} → ${players[v.target]}`).join(' ／ ')||'個別の投票記録なし';details.append(choices);
+        choices.textContent=mvDetailSettings.publicVotes
+          ? (item.votes.map(v=>`${players[v.voter]} → ${players[v.target]}`).join(' ／ ')||'個別の投票記録なし')
+          : '個別の投票先は非公開設定です';
+        details.append(choices);
       }
     });logSection.append(details);
   });root.append(logSection);

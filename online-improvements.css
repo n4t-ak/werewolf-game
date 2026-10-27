@@ -11,3 +11,122 @@ body.mv-theme .online-private-result[hidden]{display:none!important}
 body.mv-theme #online-night-tarot{display:grid;justify-items:center}
 body.mv-theme #online-night-role[hidden],body.mv-theme #online-wolf-chat-panel[hidden]{display:none!important}
 @media(max-width:480px){body.mv-theme #online-chat-messages{height:52dvh!important;min-height:350px}body.mv-theme #online-chat-input,body.mv-theme #online-wolf-chat-input{min-height:108px}body.mv-theme #online-wolf-chat-messages{height:40dvh;min-height:260px}}
+
+/* ==========================================
+   オンラインチャット：スマホ表示の改善
+   昼チャット・人狼専用チャット共通
+   ========================================== */
+
+/* 入力欄と送信ボタンを縦並びにする */
+body.mv-theme .online-chat-form,
+body.mv-theme .wolf-chat-form {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* テキスト入力欄 */
+body.mv-theme #online-chat-input,
+body.mv-theme #wolf-chat-input,
+body.mv-theme .online-chat-form textarea,
+body.mv-theme .wolf-chat-form textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 130px !important;
+  padding: 15px !important;
+
+  font-size: 16px !important;
+  line-height: 1.7 !important;
+
+  color: #fff1d8 !important;
+  background: #141c2b !important;
+
+  border: 1px solid #b59a68 !important;
+  border-radius: 12px !important;
+
+  resize: vertical;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+/* 入力欄を選択したとき */
+body.mv-theme #online-chat-input:focus,
+body.mv-theme #wolf-chat-input:focus {
+  outline: 2px solid #f1cc83 !important;
+  outline-offset: 2px;
+  border-color: #f1cc83 !important;
+}
+
+/* 送信ボタンを入力欄の下に大きく表示 */
+body.mv-theme #online-chat-send,
+body.mv-theme #wolf-chat-send,
+body.mv-theme .online-chat-form button[type="submit"],
+body.mv-theme .wolf-chat-form button[type="submit"] {
+  box-sizing: border-box;
+  display: block;
+  width: 100% !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 13px 16px !important;
+
+  font-size: 16px !important;
+  font-weight: 800 !important;
+
+  color: #fff0cc !important;
+  background: linear-gradient(
+    120deg,
+    #685135,
+    #463727
+  ) !important;
+
+  border: 1px solid #c3a36a !important;
+  border-radius: 12px !important;
+
+  cursor: pointer;
+}
+
+/* チャット欄が画面幅を超えないようにする */
+body.mv-theme .online-chat-panel,
+body.mv-theme .wolf-chat-panel {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* チャット本文の読みやすさ */
+body.mv-theme .online-chat-messages,
+body.mv-theme .wolf-chat-messages {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: clamp(300px, 48dvh, 520px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* スマートフォン */
+@media (max-width: 480px) {
+  body.mv-theme .online-chat-panel,
+  body.mv-theme .wolf-chat-panel {
+    padding: 12px !important;
+  }
+
+  body.mv-theme #online-chat-input,
+  body.mv-theme #wolf-chat-input {
+    min-height: 150px !important;
+    font-size: 16px !important;
+  }
+
+  body.mv-theme .online-chat-messages,
+  body.mv-theme .wolf-chat-messages {
+    height: clamp(280px, 43dvh, 440px);
+  }
+}

@@ -728,3 +728,16 @@ body.mv-theme .choice-button.mv-person-choice:focus-visible {
     transition: none !important;
   }
 }
+
+
+/* 夜の行動画面：青い外枠を削除 */
+body.mv-theme[data-scene="night"] .game-card {
+  border-color: #a78a57 !important;
+}
+
+/* 夜の行動で表示される不要な青い囲みを削除 */
+body.mv-theme #online-night-screen .online-role-card {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}

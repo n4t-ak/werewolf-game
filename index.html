@@ -1,37 +1,93 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c101d">
-  <title>人狼ゲーム | WEREWOLF</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
-  
-<link rel="stylesheet" href="seer-result.css?v=20261027">
 
+  <title>人狼ゲーム | WEREWOLF</title>
+
+  <!-- 基本デザイン -->
+  <link rel="stylesheet" href="./style.css">
+
+  <!-- 採用済みの黒・金デザイン -->
+  <link rel="stylesheet" href="./theme.css?v=20261027-final-3">
+
+  <!-- 占い結果の強調表示 -->
+  <link rel="stylesheet" href="./seer-result.css?v=20261027">
+
+  <!-- 役職カード -->
+  <script src="./role-card.js?v=20261027" defer></script>
+
+  <!-- オフライン版ゲーム本体 -->
+  <script src="./script.js?v=20261027" defer></script>
 </head>
-<body>
+
+<body class="mv-theme" data-scene="lobby">
+
   <main class="app-shell">
+
     <header class="app-header">
       <div class="brand-mark" aria-hidden="true">☾</div>
-      <p class="eyebrow">ONE DEVICE · ALL PLAYERS</p>
+      <p class="eyebrow">
+        ONE DEVICE · ALL PLAYERS
+      </p>
+
       <h1>人狼ゲーム</h1>
-      <p class="subtitle">闇に潜む人狼を見つけ出せ。</p>
+
+      <p class="subtitle">
+        闇に潜む人狼を見つけ出せ。
+      </p>
     </header>
+
+    
+<nav class="mv-mode-nav" aria-label="ゲームモード">
+  <a href="./index.html" aria-current="page">
+    ☽ 1台で遊ぶ
+  </a>
+  <a href="./online.html">
+    ✦ オンラインで遊ぶ
+  </a>
+</nav>
+
+
     <section class="game-card" aria-label="ゲーム操作">
+
       <div id="game">
         <h2>プレイヤー数を選択</h2>
+
         <p>3〜20人でゲームを開始できます。</p>
-        <label for="count" class="field-label">参加人数</label>
+
+        <label for="count" class="field-label">
+          参加人数
+        </label>
+
         <div class="number-field">
-          <input type="number" id="count" min="3" max="20" step="1" value="5" inputmode="numeric">
+          <input
+            type="number"
+            id="count"
+            min="3"
+            max="20"
+            step="1"
+            value="5"
+            inputmode="numeric"
+          >
           <span>人</span>
         </div>
-        <button id="start" type="button">次へ進む →</button>
+
+        <button id="start" type="button">
+          次へ進む →
+        </button>
       </div>
+
     </section>
-    <footer class="app-footer">PASS THE PHONE · KEEP YOUR ROLE SECRET</footer>
+
+    <footer class="app-footer">
+      PASS THE PHONE · KEEP YOUR ROLE SECRET
+    </footer>
+
   </main>
+
 </body>
 </html>

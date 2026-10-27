@@ -39,21 +39,29 @@ const roleTypes = [
 
 // 夜・昼の個人操作画面に役職を表示する（受け渡し画面には表示しない）
 function showPrivateRoleBadge() {
-  if (privateActor === null) return;
-  if (!roles[privateActor]) return;
+  // 端末の受け渡し画面では、役職を表示しない。
+  if (privateActor === null || !roles[privateActor]) return;
 
-  const badge = document.createElement("div");
-  badge.className = "private-role-badge";
-  badge.setAttribute("aria-label", "あなたの役職");
+  const stage = document.createElement('div');
+  stage.className = 'mv-private-role-card-stage';
+  stage.setAttribute('aria-label', `あなたの役職：${roles[privateActor]}`);
 
-  const label = document.createElement("span");
-  label.textContent = "あなたの役職";
+  // 役職名だけを表示する旧バッジは作らず、カード画像を表示する。
+  if (window.MVRoleCard) {
+    window.MVRoleCard.mount(stage, roles[privateActor], {
+      compact: false,
+      animate: true
+    });
+  } else {
+    const fallback = document.createElement('strong');
+    fallback.textContent = roles[privateActor];
+    stage.appendChild(fallback);
+  }
 
-  const value = document.createElement("strong");
-  value.textContent = roles[privateActor];
-
-  badge.append(label, value);
-  game.prepend(badge);
+  // 見出しの直下へ置く。選択・決定ボタンより上に表示する。
+  const heading = game.querySelector('h2');
+  if (heading) heading.after(stage);
+  else game.prepend(stage);
 }
 
 // 画面が切り替わったとき、ふわっと現れるアニメーション
@@ -167,6 +175,8 @@ function proceedFromPlayerCount() {
     return;
   }
 
+  const nav = document.querySelector('.mv-mode-nav');
+  if (nav) nav.hidden = true;
   showNameForm(count);
 }
 
@@ -211,14 +221,9 @@ function showNameForm(count) {
   document.getElementById("register").onclick = () => {
     const inputs = document.querySelectorAll(".name-input");
 
-    players = Array.from(inputs).map(input =>
-      input.value.trim()
+    players = Array.from(inputs).map((input, index) =>
+      input.value.trim() || `プレイヤー${index + 1}`
     );
-
-    if (players.some(name => name === "")) {
-      alert("全員の名前を入力してください");
-      return;
-    }
 
     if (new Set(players).size !== players.length) {
       alert("同じ名前は使用できません");

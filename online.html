@@ -145,13 +145,31 @@
     #online-last-game-panel h3,#online-last-game-panel h4{color:#fff}
     .online-subtle-action{background:#334560;border:1px solid #566e90;color:#fff;border-radius:11px}
     @media(max-width:420px){.online-finale-section{padding:18px 12px}.online-review-line{grid-template-columns:1fr;gap:1px}.online-finale-header{padding:26px 12px}}
+
+/* オンライン昼議論チャット */
+.online-chat-panel{background:#182338;border:1px solid #43526e;border-radius:16px;padding:14px;margin:18px 0;color:#fff}
+.online-chat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px}
+.online-chat-header strong{font-size:17px;color:#f8fafc}.online-chat-header span{font-size:12px;color:#b6c5d9}
+.online-chat-messages{height:280px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:10px;padding:12px;background:#101a2b;border-radius:12px}
+.online-chat-bubble{align-self:flex-start;max-width:88%;padding:8px 12px;border-radius:12px 12px 12px 3px;background:#2f3d56;overflow-wrap:anywhere}
+.online-chat-bubble.is-mine{align-self:flex-end;background:#3b5575;border-radius:12px 12px 3px 12px}
+.online-chat-author{font-size:11px;color:#c4d4ea;font-weight:700}
+.online-chat-bubble p{margin:4px 0 0;color:#fff;white-space:pre-wrap;font-size:14px;line-height:1.6}
+.online-chat-empty{font-size:13px;color:#bdc7d8;text-align:center;margin:auto!important}
+.online-chat-form{display:flex;gap:8px;margin-top:12px;align-items:stretch}
+#online-chat-input{min-width:0;flex:1;margin:0;padding:12px 10px;border:1px solid #67758f;border-radius:10px;background:#f9fbff;color:#192337;font-size:16px}
+#online-chat-send{width:auto;flex:none;margin:0;padding:10px 18px;border-radius:10px;background:#536a9e;color:#fff}
+#online-chat-send:disabled{opacity:.5;cursor:not-allowed}
+.online-chat-notice{color:#bec9dc;font-size:12px;margin:8px 0 0}
+#online-night-result:not(:empty){display:block;white-space:pre-line;background:#223450;border:1px solid #59739b;border-radius:12px;padding:14px;color:#fff;line-height:1.8}
+@media(max-width:400px){.online-chat-panel{padding:10px}.online-chat-messages{height:260px}#online-chat-send{padding:10px 12px}}
 </style>
 </head>
 <body>
 
 
 
-<script type="module" src="./online.js?v=20261024-replay-1"></script>
+<script type="module" src="./online.js?v=20261024-chat-thief"></script>
 
 
 
@@ -439,6 +457,15 @@
   <p id="online-discussion-message">
     議論中です。
   </p>
+  <section class="online-chat-panel" aria-label="昼の議論チャット">
+    <div class="online-chat-header"><strong>議論チャット</strong><span>リアルタイム</span></div>
+    <div id="online-chat-messages" class="online-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <form id="online-chat-form" class="online-chat-form">
+      <input id="online-chat-input" type="text" maxlength="300" autocomplete="off" placeholder="発言を入力（300文字以内）" aria-label="チャットのメッセージ">
+      <button id="online-chat-send" type="submit">送信</button>
+    </form>
+    <p id="online-chat-notice" class="online-chat-notice"></p>
+  </section>
   <h3>参加者</h3>
   <div id="online-discussion-members"></div>
 

@@ -1,0 +1,12 @@
+
+/* Seer reveal, online only. Existing controls and tarot styles are untouched. */
+body.mv-theme .mv-seer-result{box-sizing:border-box;padding:20px 15px;margin:16px 0;border:2px solid #d5b276!important;border-radius:15px!important;background:linear-gradient(145deg,#1c3040,#131827)!important;text-align:center;color:#fff2d4!important;display:grid;gap:9px;box-shadow:0 0 22px #bfa16422}
+body.mv-theme .mv-seer-result[hidden]{display:none!important}
+body.mv-theme .mv-seer-caption{color:#dbc48e;font-size:14px;font-weight:700;letter-spacing:.14em}
+body.mv-theme .mv-seer-person{display:block;color:#ffdda0;font-size:clamp(25px,7vw,35px);font-weight:900;overflow-wrap:anywhere;line-height:1.35}
+body.mv-theme .mv-seer-label{color:#d6c9b0;font-size:13px}
+body.mv-theme .mv-seer-verdict{display:block;color:#83e2b0;font-size:clamp(28px,8vw,40px);font-weight:900;line-height:1.3}
+body.mv-theme .mv-seer-result--wolf{border-color:#d65f6d!important;background:linear-gradient(145deg,#40232e,#191b29)!important}
+body.mv-theme .mv-seer-result--wolf .mv-seer-verdict{color:#ff7686}
+body.mv-theme .mv-night-wolf-friends{padding:14px 12px;border:1px solid #bb5363;border-radius:12px;background:#3e202b;color:#ff748a!important;font-size:clamp(20px,5.5vw,29px);font-weight:900;overflow-wrap:anywhere;text-align:center}
+body.mv-theme .mv-night-wolf-friends[hidden]{display:none!important}

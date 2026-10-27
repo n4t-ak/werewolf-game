@@ -292,7 +292,7 @@ $('online-start-game').onclick=async()=>{
   while(pool.length<ids.length)pool.push('村人');
   if(s.extras.roleMissing){const possible=pool.map((r,i)=>r!=='人狼'&&r!=='村人'?i:-1).filter(i=>i>=0);pool[possible[randomIndex(possible.length)]]='村人';}
   pool=shuffled(pool);const roles={};ids.forEach((id,i)=>roles[id]=pool[i]);
-  await update(roomRef(''),{settings:s,roles,initialRoles:roles,'meta/phase':'firstNight'});
+  await update(roomRef(''),{settings:s,roles,initialRoles:roles,'meta/phase':'night'});
  }catch(e){notification('開始エラー：'+e.message);$('online-start-game').disabled=false;}
 };
 
@@ -322,7 +322,48 @@ function nightTargets(){const r=myRole();let ids=alive();if(r!=='騎士')ids=ids
  return ids;
 }
 
-// 人狼専用チャットはrooms配下に置かない。一般参加者のrooms読取権限と分離する。
+// 狼チャットは独立したwolfChats配下に保存（一般参加者のrooms権限とは分離）。
+// 狂人は「人狼把握」設定がONのときだけ閲覧・発言できる。
+let mvDayChatMode = 'public';
+function mvWolfChatEligible() {
+ if (!uid || !room || !members()[uid]) return false;
+ // 脱落者は人狼専用チャットも閲覧できる（送信はできない）。
+ if (!living(uid)) return true;
+ const role = myRole();
+ const authorized = role === '人狼' || (role === '狂人' && setting('madmanKnowsWolves'));
+ if (!authorized) return false;
+ const teammates = Object.keys(data?.roles || {}).filter(id =>
+  living(id) && (data.roles[id] === '人狼' ||
+   (data.roles[id] === '狂人' && setting('madmanKnowsWolves'))));
+ return teammates.length >= 2;
+}
+function mvSyncDayChatTabs() {
+ const tabs=$('mv-day-chat-tabs');
+ const wolfPanel=$('online-wolf-chat-panel');
+ const regularMessages=$('online-chat-messages');
+ const regularForm=$('online-chat-form');
+ const regularNotice=$('online-chat-notice');
+ if(!tabs||!wolfPanel)return;
+ const isDay=phase()==='discussion';
+ const allowed=isDay&&mvWolfChatEligible();
+ tabs.hidden=!allowed;
+ if(!allowed)mvDayChatMode='public';
+ const wolfMode=allowed&&mvDayChatMode==='wolf';
+ for(const id of ['mv-chat-tab-public','mv-chat-tab-wolf']){
+  const b=$(id);if(!b)continue;
+  const current=(id==='mv-chat-tab-wolf')===wolfMode;
+  b.classList.toggle('is-current',current);
+  b.setAttribute('aria-selected',String(current));
+ }
+ if(isDay){
+  regularMessages.hidden=wolfMode;
+  regularForm.hidden=wolfMode || !living(uid);
+  regularNotice.hidden=wolfMode;
+  wolfPanel.hidden=!wolfMode;
+ }
+}
+$('mv-chat-tab-public')?.addEventListener('click',()=>{mvDayChatMode='public';mvSyncDayChatTabs();});
+$('mv-chat-tab-wolf')?.addEventListener('click',()=>{mvDayChatMode='wolf';mvSyncDayChatTabs();});
 function stopWolfChat(){
  if(offWolfChat){offWolfChat();offWolfChat=null;}
  wolfChatKey='';
@@ -330,13 +371,24 @@ function stopWolfChat(){
 }
 function renderWolfChat(){
  const panel=$('online-wolf-chat-panel');if(!panel)return;
- const permitted=!!room&&!!uid&&phase()==='night'&&myRole()==='人狼'&&living(uid);
- if(!permitted){stopWolfChat();return;}
- panel.hidden=false;
+ const inActivePhase=phase()==='night'||phase()==='discussion';
+ if(!inActivePhase||!mvWolfChatEligible()){stopWolfChat();mvSyncDayChatTabs();return;}
+ // 夜は夜画面に、昼は議論チャット内に、同一のチャットを移動する。
+ const destination=phase()==='night' ? $('mv-night-wolf-chat-slot') : $('mv-day-wolf-chat-slot');
+ if(destination && panel.parentElement!==destination)destination.append(panel);
+ panel.hidden=phase()==='discussion' && mvDayChatMode!=='wolf';
  const key=`${room}/${round()}`;
- if(wolfChatKey===key && offWolfChat)return;
- stopWolfChat();panel.hidden=false;wolfChatKey=key;
+ if(wolfChatKey===key && offWolfChat){mvSyncDayChatTabs();return;}
+ stopWolfChat();wolfChatKey=key;
+ panel.hidden=phase()==='discussion' && mvDayChatMode!=='wolf';
  const holder=$('online-wolf-chat-messages');holder.replaceChildren();
+ const note=$('online-wolf-chat-notice');
+ const ghost=!living(uid);
+ const form=$('online-wolf-chat-form');
+ if(form)form.hidden=ghost;
+ const send=$('online-wolf-chat-send');
+ if(send)send.disabled=ghost;
+ note.textContent=ghost?'脱落者は閲覧のみ可能です。送信はできません。':'人狼陣営の参加資格がある生存者だけが発言できます。';
  offWolfChat=onValue(ref(db,`wolfChats/${key}`),snapshot=>{
   if(wolfChatKey!==key)return;
   const entries=Object.entries(snapshot.val()||{}).filter(([,v])=>v&&typeof v.text==='string'&&members()[v.uid]);
@@ -355,33 +407,47 @@ function renderWolfChat(){
   }
   if(!entries.length){const empty=document.createElement('p');empty.className='online-chat-empty';empty.textContent='まだ相談メッセージはありません。';holder.append(empty);}
   if(nearBottom)holder.scrollTop=holder.scrollHeight;
- },err=>{$('online-wolf-chat-notice').textContent='チャット取得エラー：'+err.message+'（Firebase Rulesを確認してください）';});
+ },err=>{note.textContent='チャット取得エラー：'+err.message+'（Firebase Rulesを確認してください）';});
+ mvSyncDayChatTabs();
 }
 $('online-wolf-chat-form')?.addEventListener('submit',async event=>{
  event.preventDefault();
- if(!room||!uid||phase()!=='night'||myRole()!=='人狼'||!living(uid))return;
+ if(!room||!uid||!['night','discussion'].includes(phase())||!mvWolfChatEligible())return;
  const input=$('online-wolf-chat-input'),submit=$('online-wolf-chat-send'),message=input.value.trim();
- if(!message||message.length>300)return;
+ if(!message||message.length>300||submit.disabled)return;
  submit.disabled=true;
  try{await push(ref(db,`wolfChats/${room}/${round()}`),{uid,text:message,at:Date.now()});input.value='';}
  catch(e){$('online-wolf-chat-notice').textContent='送信エラー：'+e.message+'（Firebase Rulesを確認してください）';}
  finally{submit.disabled=false;}
 });
 
+function mvShowSeerResult(element, person, verdict){
+ const wolf=verdict==='人狼';
+ element.replaceChildren(); element.classList.add('mv-seer-result');
+ element.classList.toggle('mv-seer-result--wolf',wolf);
+ const title=document.createElement('div'); title.className='mv-seer-caption';title.textContent='占い結果';
+ const name=document.createElement('strong');name.className='mv-seer-person';name.textContent=person;
+ const label=document.createElement('div');label.className='mv-seer-label';label.textContent='判定';
+ const result=document.createElement('strong');result.className='mv-seer-verdict';result.textContent=wolf?'人狼':'人狼ではない';
+ element.append(title,name,label,result);
+}
 function renderNight(){setView('online-night-screen');$('online-night-title').textContent=round()===1?'初夜':`${round()}日目の夜`;
  const r=myRole(),rn=thisRound(),done=rn.nightDone||{},act=rn.nightActions?.[uid];const needs=living(uid)&&needsNightAction(r,round());
  $('online-night-role').textContent='';
  if(window.MVRoleCard && living(uid) && r) window.MVRoleCard.mount($('online-night-tarot'),r,{animate:true});
  else $('online-night-tarot').replaceChildren();
  renderWolfChat();
- let msg='夜の行動を終えてください。';
+ let msg=round()===1?'あなたの役職を確認し、最初の夜の行動を行ってください。':'夜の行動を終えてください。';
  if(!living(uid))msg='あなたは脱落しています。生存者の夜明けを待ちます。';
- else if(r==='人狼')msg='襲撃する相手を選んでください。';
+ else if(r==='人狼')msg=round()===1?'最初の夜は襲撃しません。仲間の人狼を確認してください。':'襲撃する相手を選んでください。';
  else if(r==='占い師')msg='占う相手を選んでください。';
  else if(r==='騎士')msg='護衛する相手を選んでください。自分も護衛できます。';
  else if(r==='怪盗'&&round()===1)msg='交換する相手を選ぶか、交換せずに終了してください。';
  else if(r==='霊媒師'&&round()>1){const prev=data.rounds?.[round()-1]?.voteResult?.targetUid;msg=prev?`前日処刑された${nameOf(prev)}は、${getMediumResult(data.roles,prev)}です。`:'昨日は処刑者がいませんでした。';}
  $('online-night-message').textContent=msg;
+ const friends=$('online-night-wolf-friends');
+ if(friends){const ids=Object.keys(data.roles||{}).filter(id=>id!==uid&&data.roles[id]==='人狼');const show=living(uid)&&round()===1&&(r==='人狼'||(r==='狂人'&&setting('madmanKnowsWolves')));friends.hidden=!show;friends.textContent=show?(ids.length?`仲間の人狼：${ids.map(nameOf).join('、')}`:'人狼の仲間はいません。'):'';}
+
  const targets=nightTargets();opt($('online-night-target'),targets);
  const actionArea=$('online-night-action-area');actionArea.hidden=!needs||!!done[uid]||!!act;
  $('online-night-target').disabled=targets.length===0;
@@ -390,6 +456,9 @@ function renderNight(){setView('online-night-screen');$('online-night-title').te
  $('online-night-skip').hidden=!(r==='怪盗'&&round()===1&&living(uid)&&!done[uid]&&!act) && !(needs&&targets.length===0&&!act&&!done[uid]);
  $('online-night-done').hidden=!living(uid)||!!done[uid]||needs&&!act;
  $('online-night-result').textContent=done[uid]?'完了しました。他の参加者を待っています。':act?'行動を送信しました。':' ';
+ const reveal=$('online-seer-result-now');
+ if(reveal){const target=act?.targetUid;const show=r==='占い師'&&living(uid)&&!!target;reveal.hidden=!show;if(show)mvShowSeerResult(reveal,nameOf(target),getSeerResult(data.roles||{},target));}
+ $('online-night-done').textContent=r==='占い師'&&act&&!done[uid]?'占い結果を確認して夜の行動を完了':'夜の行動を完了する';
  const previousPrivate=data.rounds?.[round()-1]?.privateResults?.[uid];
  if(previousPrivate?.text && round()>1 && (previousPrivate.type==='seer'||previousPrivate.type==='thief'||previousPrivate.type==='stolen')) $('online-night-result').textContent=previousPrivate.text+'　'+$('online-night-result').textContent;
  const status=countCompleted(done,alive());$('online-night-done-count').textContent=`夜の行動完了：${status.completed} / ${status.total}人`;
@@ -397,7 +466,7 @@ function renderNight(){setView('online-night-screen');$('online-night-title').te
 }
 $('online-submit-night').onclick=async()=>{
  if(!living(uid)||phase()!=='night')return;const r=myRole(),target=$('online-night-target').value;if(!nightTargets().includes(target))return notification('相手を選択してください。');
- try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:r,targetUid:target,at:Date.now()});await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('夜の送信：'+e.message);}
+ try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:r,targetUid:target,at:Date.now()});if(r!=='占い師')await set(roomRef(roundField(`nightDone/${uid}`)),true);else {const box=$('online-seer-result-now');if(box){box.hidden=false;mvShowSeerResult(box,nameOf(target),getSeerResult(data.roles||{},target));} $('online-night-action-area').hidden=true;$('online-night-done').hidden=false;}}catch(e){notification('夜の送信：'+e.message);}
 };
 $('online-night-done').onclick=async()=>{if(!living(uid)||needsNightAction(myRole(),round())&&!thisRound().nightActions?.[uid])return;try{await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('完了通知：'+e.message);}};
 $('online-night-skip').onclick=async()=>{if(!living(uid))return;try{await set(roomRef(roundField(`nightActions/${uid}`)),{role:myRole(),targetUid:'',skip:true,at:Date.now()});await set(roomRef(roundField(`nightDone/${uid}`)),true);}catch(e){notification('行動スキップ：'+e.message);}};
@@ -434,7 +503,8 @@ function renderDay(){setView('online-day-screen');$('online-day-title').textCont
  $('online-day-notice').textContent=result?.victimUid?`${nameOf(result.victimUid)}が襲撃されました。`: '昨夜の犠牲者はいませんでした。';
  $('online-day-notice').textContent+=' '+(result?.eventText||'');
  const personal=thisRound().privateResults?.[uid]?.text;
- $('online-private-result').textContent=personal||'';
+ $('online-private-result').classList.remove('mv-seer-result','mv-seer-result--wolf');$('online-private-result').textContent=personal||'';
+ if(thisRound().privateResults?.[uid]?.type==='seer'){const target=thisRound().nightActions?.[uid]?.targetUid;if(target)mvShowSeerResult($('online-private-result'),nameOf(target),getSeerResult(data.initialRoles||data.roles||{},target));}
  renderList($('online-day-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
  $('online-start-discussion').hidden=!host();
 }
@@ -484,9 +554,9 @@ $('online-chat-form')?.addEventListener('submit',async event=>{
 });
 function renderDiscussion(){setView('online-discussion-screen');
  const personal=thisRound().privateResults?.[uid];const resultEl=$('online-discussion-private-result');
- resultEl.hidden=!(personal?.text); resultEl.textContent=personal?.text||'';renderList($('online-discussion-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
+ resultEl.hidden=!(personal?.text);resultEl.classList.remove('mv-seer-result','mv-seer-result--wolf'); resultEl.textContent=personal?.text||'';if(personal?.type==='seer'){const target=thisRound().nightActions?.[uid]?.targetUid;if(target)mvShowSeerResult(resultEl,nameOf(target),getSeerResult(data.initialRoles||data.roles||{},target));}renderList($('online-discussion-members'),Object.keys(members()).map(id=>[nameOf(id),living(id)?'生存':'脱落']));
  $('online-discussion-controls').hidden=!host();$('online-start-vote').hidden=!host();$('online-skip-vote').hidden=!host();const ctrl=thisRound().discussionTimerControls||{};$('online-pause-discussion').textContent=ctrl.paused?'再開':'一時停止';
- renderDiscussionChat();renderTimer();if(!timer)timer=setInterval(renderTimer,500);
+ renderDiscussionChat();renderWolfChat();renderTimer();if(!timer)timer=setInterval(renderTimer,500);
 }
 $('online-add-minute').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{};await update(roomRef(roundField('discussionTimerControls')),{extraMs:(c.extraMs||0)+60000});}catch(e){notification('時間追加：'+e.message);}};
 $('online-pause-discussion').onclick=async()=>{if(!host())return;try{const c=thisRound().discussionTimerControls||{},now=Date.now();await update(roomRef(roundField('discussionTimerControls')),{paused:!c.paused,pausedAt:!c.paused?now:0,pausedMs:(c.pausedMs||0)+(c.paused?Math.max(0,now-(c.pausedAt||now)):0)});}catch(e){notification('一時停止：'+e.message);}};
@@ -708,7 +778,7 @@ $('online-last-game-review').onclick=()=>{
     currentRoles.id='online-final-roles';
   }
 };
-function render(){if(!data)return;const p=phase();if(p!=='night'||myRole()!=='人狼'||!living(uid))stopWolfChat();if(p!=='discussion'&&timer){clearInterval(timer);timer=null;}
+function render(){if(!data)return;const p=phase();if(!['night','discussion'].includes(p)||!mvWolfChatEligible())stopWolfChat();if(p!=='discussion'&&timer){clearInterval(timer);timer=null;}
  if(p==='lobby')renderLobby();else if(p==='firstNight')renderReveal();else if(p==='night')renderNight();else if(p==='day')renderDay();else if(p==='discussion')renderDiscussion();else if(p==='voting')renderVoting();else if(p==='voteResult')renderVoteResult();else if(p==='gameOver')renderGameOver();
  lastRenderedPhase=p;
 }

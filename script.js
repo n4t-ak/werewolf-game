@@ -1017,6 +1017,17 @@ function handleSeer(index) {
         "結果を確認・画面を隠す",
         nextNightPlayer
       );
+      // 結果の名前と判定を大きく表示（判定は人狼か否かのみ）。
+      const resultCard=document.createElement('div');
+      resultCard.className='mv-seer-result';
+      if(isWolf) resultCard.classList.add('mv-seer-result--wolf');
+      const cap=document.createElement('div');cap.className='mv-seer-caption';cap.textContent='占った相手';
+      const person=document.createElement('strong');person.className='mv-seer-person';person.textContent=players[target];
+      const label=document.createElement('div');label.className='mv-seer-label';label.textContent='判定結果';
+      const verdict=document.createElement('strong');verdict.className='mv-seer-verdict';verdict.textContent=isWolf?'人狼':'人狼ではない';
+      resultCard.append(cap,person,label,verdict);
+      const actionButton=game.querySelector('button');
+      if(actionButton)actionButton.before(resultCard); else game.append(resultCard);
     }
   );
 }
